@@ -1,0 +1,39 @@
+{
+  "rule_version": "quality-clean-v1.0.0",
+  "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
+  "raw_encoding": "ISO-8859-1",
+  "clean_encoding": "UTF-8",
+  "delimiter": "::",
+  "null_marker": "\\N",
+  "tables": {
+    "ratings": ["user_id", "movie_id", "rating", "timestamp"],
+    "users": ["user_id", "gender", "age", "occupation", "zip_code"],
+    "movies": ["movie_id", "title", "genres"]
+  },
+  "allowed_values": {
+    "rating": [1, 2, 3, 4, 5],
+    "gender": ["M", "F"],
+    "age": [1, 18, 25, 35, 45, 50, 56],
+    "occupation_min": 0,
+    "occupation_max": 20,
+    "genres": ["Action", "Adventure", "Animation", "Children's", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "Musical", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"]
+  },
+  "rating_timestamp_window_utc": {
+    "start_inclusive": "2000-01-01T00:00:00Z",
+    "end_inclusive": "2003-02-28T23:59:59Z"
+  },
+  "freshness_window_utc": {
+    "start_inclusive": "2002-03-01T00:00:00Z",
+    "end_inclusive": "2003-02-28T23:59:59Z"
+  },
+  "table_aggregation": "equal_weight_nonempty_tables",
+  "composite_score": false,
+  "temporal_split": {
+    "basis": "accepted_rating_timestamps_only",
+    "train_fraction_target": 0.8,
+    "validation_fraction_target": 0.1,
+    "cutoff_rounding": "UTC_day_end",
+    "boundary_selection": "first_day_with_cumulative_count_at_least_target",
+    "tie_policy": "same_UTC_day_stays_in_one_period"
+  }
+}

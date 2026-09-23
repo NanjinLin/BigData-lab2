@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
+  "registered_on": "2026-09-23",
+  "description": "Workspace-provided MovieLens 1M input files; this version identifies the exact files present before any cleaning.",
+  "delimiter": "::",
+  "declared_encoding": "ISO-8859-1",
+  "line_ending": "LF",
+  "files": {
+    "ratings.dat": {
+      "path": "ml-1m/ml-1m/ratings.dat",
+      "sha256": "1B3C4690B619D5F6BEAD9283D02AD12460DA88BD3087AC2A93959BB37F4995D2",
+      "size_bytes": 28060211,
+      "physical_lines": 1150241,
+      "expected_fields": 4,
+      "field_count_histogram": {"1": 6001, "3": 3751, "4": 1136738, "5": 3751},
+      "readme_record_count": 1000209
+    },
+    "users.dat": {
+      "path": "ml-1m/ml-1m/users.dat",
+      "sha256": "C0397B2EB6210F14A683C65D15D7D927AAFFAC0C08BCBEFDDB8CC2063A988279",
+      "size_bytes": 154374,
+      "physical_lines": 6946,
+      "expected_fields": 5,
+      "field_count_histogram": {"1": 45, "4": 32, "5": 6838, "6": 31},
+      "readme_record_count": 6040
+    },
+    "movies.dat": {
+      "path": "ml-1m/ml-1m/movies.dat",
+      "sha256": "E256099E0A8F2D7CDC4B97AC94864C5F05795B929A97B045516AC86303931E18",
+      "size_bytes": 199463,
+      "physical_lines": 4465,
+      "expected_fields": 3,
+      "field_count_histogram": {"1": 29, "2": 21, "3": 4395, "4": 20},
+      "readme_record_count": 3883,
+      "non_ascii_lines": 104,
+      "valid_utf8_as_a_whole": false
+    }
+  },
+  "notes": [
+    "Physical lines are not validated business records. All three files have more lines than the counts stated in the bundled README.",
+    "The field count is based on literal :: separators. It is a structural check, not a complete quality assessment.",
+    "No cleaning or correction has been applied to these files."
+  ]
+}
