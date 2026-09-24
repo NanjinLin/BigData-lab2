@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+# Keep Hadoop's large generated datasets, audit streams, and logs local.
+/runs/*
+!/runs/*/
+/runs/*/*
+!/runs/*/report.json
+!/runs/*/score_before.tsv
+!/runs/*/score_after.tsv

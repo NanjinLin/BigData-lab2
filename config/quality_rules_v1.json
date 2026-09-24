@@ -3,6 +3,7 @@
   "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
   "raw_encoding": "ISO-8859-1",
   "clean_encoding": "UTF-8",
+  "clean_format": "tagged_jsonl",
   "delimiter": "::",
   "null_marker": "\\N",
   "tables": {
