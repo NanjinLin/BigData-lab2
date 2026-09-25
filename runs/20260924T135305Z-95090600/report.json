@@ -1,0 +1,870 @@
+{
+  "task_id": "20260924T135305Z-95090600",
+  "status": "completed",
+  "started_at": "2026-09-24T13:53:10Z",
+  "completed_at": "2026-09-24T14:00:31Z",
+  "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
+  "rule_version": "quality-clean-v1.0.0",
+  "rule_sha256": "59915ec6317ca500e2a44f845fe6245b6659d10d5f530460ea1ce14c5d73ddb3",
+  "code_sha256": "540e0f89996d0483b00f66162d3c441b471b6467d84751949954c8dccf45564e",
+  "clean_data_version": "clean-c91a5e196ca1af48c3da",
+  "clean_data_sha256": "c91a5e196ca1af48c3dae9d2f5a6d66164fd222931ba7d954426eb02df811fa7",
+  "T1": "2000-12-01T23:59:59Z",
+  "T2": "2000-12-28T23:59:59Z",
+  "period_counts": {
+    "train": 797116,
+    "validation": 100886,
+    "test": 98111
+  },
+  "quality_before": {
+    "kind": "raw",
+    "rule_version": "quality-clean-v1.0.0",
+    "overall": {
+      "Accurate": 92.65506785746992,
+      "Complete": 99.11282993487866,
+      "Unique": 95.88671094106974,
+      "Consistent": 83.83970739779701,
+      "Up-to-date": 1.884996274693738
+    },
+    "tables": {
+      "ratings": {
+        "rows": 1150241,
+        "metrics": {
+          "Accurate": {
+            "numerator": 1057220,
+            "denominator": 1150241,
+            "score": 91.91291216362484
+          },
+          "Complete": {
+            "numerator": 4565707,
+            "denominator": 4600964,
+            "score": 99.23370406723461
+          },
+          "Unique": {
+            "numerator": 1057984,
+            "denominator": 1150241,
+            "score": 91.97933302673091
+          },
+          "Consistent": {
+            "numerator": 1015617,
+            "denominator": 1150241,
+            "score": 88.29601796493083
+          },
+          "Up-to-date": {
+            "numerator": 21682,
+            "denominator": 1150241,
+            "score": 1.884996274693738
+          }
+        }
+      },
+      "users": {
+        "rows": 6946,
+        "metrics": {
+          "Accurate": {
+            "numerator": 6447,
+            "denominator": 6946,
+            "score": 92.81600921393608
+          },
+          "Complete": {
+            "numerator": 34427,
+            "denominator": 34730,
+            "score": 99.12755542758423
+          },
+          "Unique": {
+            "numerator": 6828,
+            "denominator": 6946,
+            "score": 98.30118053556004
+          },
+          "Consistent": {
+            "numerator": 5622,
+            "denominator": 6946,
+            "score": 80.9386697379787
+          }
+        }
+      },
+      "movies": {
+        "rows": 4465,
+        "metrics": {
+          "Accurate": {
+            "numerator": 4163,
+            "denominator": 4465,
+            "score": 93.23628219484883
+          },
+          "Complete": {
+            "numerator": 13258,
+            "denominator": 13395,
+            "score": 98.9772303098171
+          },
+          "Unique": {
+            "numerator": 4348,
+            "denominator": 4465,
+            "score": 97.37961926091825
+          },
+          "Consistent": {
+            "numerator": 3674,
+            "denominator": 4465,
+            "score": 82.28443449048152
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "conflicting_user_ids": 608,
+      "conflicting_movie_ids": 337,
+      "conflicting_rating_events": 4096
+    }
+  },
+  "quality_after": {
+    "kind": "clean",
+    "rule_version": "quality-clean-v1.0.0",
+    "overall": {
+      "Accurate": 97.192582465272,
+      "Complete": 98.89456673248624,
+      "Unique": 100.0,
+      "Consistent": 100.0,
+      "Up-to-date": 2.1766606800634065
+    },
+    "tables": {
+      "ratings": {
+        "rows": 996113,
+        "metrics": {
+          "Accurate": {
+            "numerator": 996113,
+            "denominator": 996113,
+            "score": 100.0
+          },
+          "Complete": {
+            "numerator": 3984452,
+            "denominator": 3984452,
+            "score": 100.0
+          },
+          "Unique": {
+            "numerator": 996113,
+            "denominator": 996113,
+            "score": 100.0
+          },
+          "Consistent": {
+            "numerator": 996113,
+            "denominator": 996113,
+            "score": 100.0
+          },
+          "Up-to-date": {
+            "numerator": 21682,
+            "denominator": 996113,
+            "score": 2.1766606800634065
+          }
+        }
+      },
+      "users": {
+        "rows": 6112,
+        "metrics": {
+          "Accurate": {
+            "numerator": 5895,
+            "denominator": 6112,
+            "score": 96.44960732984293
+          },
+          "Complete": {
+            "numerator": 30216,
+            "denominator": 30560,
+            "score": 98.87434554973822
+          },
+          "Unique": {
+            "numerator": 6112,
+            "denominator": 6112,
+            "score": 100.0
+          },
+          "Consistent": {
+            "numerator": 6112,
+            "denominator": 6112,
+            "score": 100.0
+          }
+        }
+      },
+      "movies": {
+        "rows": 3941,
+        "metrics": {
+          "Accurate": {
+            "numerator": 3749,
+            "denominator": 3941,
+            "score": 95.1281400659731
+          },
+          "Complete": {
+            "numerator": 11564,
+            "denominator": 11823,
+            "score": 97.80935464772054
+          },
+          "Unique": {
+            "numerator": 3941,
+            "denominator": 3941,
+            "score": 100.0
+          },
+          "Consistent": {
+            "numerator": 3941,
+            "denominator": 3941,
+            "score": 100.0
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "conflicting_user_ids": 0,
+      "conflicting_movie_ids": 0,
+      "conflicting_rating_events": 0
+    }
+  },
+  "quality_delta": {
+    "Accurate": 4.5375146078020805,
+    "Complete": -0.21826320239242136,
+    "Unique": 4.113289058930263,
+    "Consistent": 16.160292602202986,
+    "Up-to-date": 0.2916644053696684
+  },
+  "cleaning": {
+    "kind": "clean_report",
+    "task_id": "20260924T135305Z-95090600",
+    "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
+    "rule_version": "quality-clean-v1.0.0",
+    "tables": {
+      "ratings": {
+        "input": 1150241,
+        "contributing": 996113,
+        "duplicate": 0,
+        "quarantine": 154128,
+        "output": 996113,
+        "normalized_fields": 0,
+        "masked_source_fields": 0,
+        "reasons": {
+          "invalid_rating": 43885,
+          "invalid_timestamp": 28881,
+          "unknown_user": 10502,
+          "wrong_field_count": 13503,
+          "unknown_movie": 10502,
+          "invalid_id": 6752,
+          "same_event_conflicting_rating": 40103
+        }
+      },
+      "users": {
+        "input": 6946,
+        "contributing": 6720,
+        "duplicate": 118,
+        "quarantine": 108,
+        "output": 6112,
+        "normalized_fields": 0,
+        "masked_source_fields": 391,
+        "reasons": {
+          "invalid_occupation": 100,
+          "non_us_zip_pattern": 107,
+          "wrong_field_count": 108,
+          "invalid_age": 100,
+          "invalid_gender": 100,
+          "same_id_conflicting_attribute": 344,
+          "same_id_same_attributes": 118
+        }
+      },
+      "movies": {
+        "input": 4465,
+        "contributing": 4191,
+        "duplicate": 204,
+        "quarantine": 70,
+        "output": 3941,
+        "normalized_fields": 47,
+        "masked_source_fields": 232,
+        "reasons": {
+          "missing_title_year": 58,
+          "unknown_genre": 174,
+          "normalized_field": 47,
+          "possible_mojibake": 47,
+          "wrong_field_count": 70,
+          "same_id_same_attributes": 204,
+          "same_id_conflicting_attribute": 259
+        }
+      }
+    },
+    "unresolved": {
+      "missing_title_year": 58,
+      "movies_genres_conflict": 67,
+      "movies_title_conflict": 192,
+      "non_us_zip_pattern": 107,
+      "possible_mojibake": 47,
+      "users_age_conflict": 127,
+      "users_gender_conflict": 127,
+      "users_zip_code_conflict": 90
+    },
+    "T1": "2000-12-01T23:59:59Z",
+    "T2": "2000-12-28T23:59:59Z",
+    "period_counts": {
+      "train": 797116,
+      "validation": 100886,
+      "test": 98111
+    },
+    "audit_samples": {
+      "invalid_occupation": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_occupation",
+          "count": 1,
+          "raw": "320::M::35::99::99516",
+          "source_hash": "d5ccdabd9c6de769d3350790c62bd7218c2272bfb2ee4fb85595e0acf071fa1a"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_occupation",
+          "count": 1,
+          "raw": "3854::M::25::99::30340",
+          "source_hash": "ba8e3b93009ed591bd8ec59d634fd4d72b69d04b4512b3ed8b70dc06533d6aaa"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_occupation",
+          "count": 1,
+          "raw": "1832::F::18::99::14433",
+          "source_hash": "7795384f4233cc97eddae04048fc77dfc403118b2953d0b93c0941fb3c1af48c"
+        }
+      ],
+      "non_us_zip_pattern": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "flag",
+          "reason": "non_us_zip_pattern",
+          "count": 1,
+          "raw": "2324::M::35::17::ABCDE",
+          "source_hash": "dc1aa38cd8810692db140af141f42c50b0d1ca41b1d3289835e7eda777005ed4"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "flag",
+          "reason": "non_us_zip_pattern",
+          "count": 1,
+          "raw": "3461::M::35::0::ABCDE",
+          "source_hash": "007d564f3a3fbeeb9bf8b6260983dde85be6875f9ac6c63e28faa6466a32745c"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "flag",
+          "reason": "non_us_zip_pattern",
+          "count": 1,
+          "raw": "306::M::18::0::ABCDE",
+          "source_hash": "fd82a1d44e90ff467d885107a067cbc40c59f180aace3383a3b2b3c5d2670f71"
+        }
+      ],
+      "wrong_field_count": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "quarantine",
+          "reason": "wrong_field_count",
+          "count": 1,
+          "raw": "3012:M:25:12:78660",
+          "source_hash": "eee4ca65e6089b0fb3d1c3d5f3109ad6244e6b11b47eb2dc85a51b366a939402"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "quarantine",
+          "reason": "wrong_field_count",
+          "count": 1,
+          "raw": "1033::M::25::5",
+          "source_hash": "0eb959dbd7ee0f86144760394f0e39f235643a2cd73b132ffe69bca2ea661537"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "quarantine",
+          "reason": "wrong_field_count",
+          "count": 1,
+          "raw": "141:M:35:13:62035",
+          "source_hash": "dbdc9b812831864c587d9d56ca52e43986bb963749adcbc2ec05d0eb2c1f31f7"
+        }
+      ],
+      "invalid_age": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_age",
+          "count": 1,
+          "raw": "1936::M::30::0::90026",
+          "source_hash": "bfef23007d0ac9584c9720c1f0c1a595b7a5bd8b8c99bf140b8381768398affc"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_age",
+          "count": 1,
+          "raw": "626::M::30::4::77005",
+          "source_hash": "1851ac6fc43b594eb056592a132e0abaa5e1829b69c9398dc8a7fe070e162fc4"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_age",
+          "count": 1,
+          "raw": "2542::F::30::13::37922",
+          "source_hash": "2268b7aee65ac9d7bec37f00c0d7d32a9f7900a3e8301b7bbe9ec910bdc756a7"
+        }
+      ],
+      "invalid_gender": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_gender",
+          "count": 1,
+          "raw": "281::X::35::0::94117",
+          "source_hash": "0039d58bba9e32149fb108eb2e7686c4bc520745234e8d3dd2687adf55abcf96"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_gender",
+          "count": 1,
+          "raw": "405::X::56::1::13077",
+          "source_hash": "286285038c3909b93130abbd3362f679e7cd3a27b897120daa816f5fcdc903c7"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask",
+          "reason": "invalid_gender",
+          "count": 1,
+          "raw": "1384::X::18::10::98058",
+          "source_hash": "f44e73653d3f79e801cd481f3be8fbb50330c53e4136c3d6e1ac1aaef9c44994"
+        }
+      ],
+      "same_id_conflicting_attribute": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask_conflict",
+          "reason": "same_id_conflicting_attribute",
+          "count": 1,
+          "details": {
+            "id": 24,
+            "field": "zip_code",
+            "values": [
+              "10023",
+              "ABCDE"
+            ]
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask_conflict",
+          "reason": "same_id_conflicting_attribute",
+          "count": 1,
+          "details": {
+            "id": 39,
+            "field": "zip_code",
+            "values": [
+              "12",
+              "61820"
+            ]
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "mask_conflict",
+          "reason": "same_id_conflicting_attribute",
+          "count": 1,
+          "details": {
+            "id": 60,
+            "field": "gender",
+            "values": [
+              "F",
+              "M"
+            ]
+          }
+        }
+      ],
+      "same_id_same_attributes": [
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "deduplicate",
+          "reason": "same_id_same_attributes",
+          "count": 1,
+          "raw": "45::F::45::16::94110",
+          "source_hash": "e1e9b93ecfc8ab5fdb7d7c7e0007cdedfe582b3365bb24ddb64e629035f7a6d7"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "deduplicate",
+          "reason": "same_id_same_attributes",
+          "count": 1,
+          "raw": "56::M::35::20::60440",
+          "source_hash": "2cf36317c27c065aa2601fc3fc18c08f842d30601456341778af5b921f277db6"
+        },
+        {
+          "kind": "audit",
+          "table": "users",
+          "action": "deduplicate",
+          "reason": "same_id_same_attributes",
+          "count": 1,
+          "raw": "150::M::35::7::98144",
+          "source_hash": "e99d76d1d98018ea5d8086ed98afbd975edb9e1c9f4c43a11774956abb1085d8"
+        }
+      ],
+      "missing_title_year": [
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "missing_title_year",
+          "count": 1,
+          "raw": "851::Movie with malformed year [20XX]::Drama",
+          "source_hash": "f9fa908f2b2f3f75057dc47e52601809743963e27bbf23528eabebcbc638f43d"
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "missing_title_year",
+          "count": 1,
+          "raw": "1533::Movie with malformed year [20XX]::Drama",
+          "source_hash": "1b021e5b49a5cc541144ca23cd2bd323c69aa6cd43ddb7b2d9886a3ff41cd1f4"
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "missing_title_year",
+          "count": 1,
+          "raw": "2754::Movie with malformed year [20XX]::Horror",
+          "source_hash": "67e318fe37489147ba3a2813cc668ae34949a491efd6b75d25b7d071ab0617f6"
+        }
+      ],
+      "unknown_genre": [
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "mask",
+          "reason": "unknown_genre",
+          "count": 1,
+          "raw": "876::Police Story 4: Project S (Chao ji ji hua) (1993)::Action|UnknownGenre",
+          "source_hash": "89c829c64521493249479242a5d3edfdc80b9daf08ce9362499faa617d63f512",
+          "details": {
+            "tokens": [
+              "UnknownGenre"
+            ]
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "mask",
+          "reason": "unknown_genre",
+          "count": 1,
+          "raw": "180::Mallrats (1995)::Comedy|UnknownGenre",
+          "source_hash": "65a5a50e736e53530fa8f326c5d500e9ad7a41450d268e1603eeda2789d13f50",
+          "details": {
+            "tokens": [
+              "UnknownGenre"
+            ]
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "mask",
+          "reason": "unknown_genre",
+          "count": 1,
+          "raw": "350::Client, The (1994)::Drama|Mystery|Thriller|UnknownGenre",
+          "source_hash": "76eb26f4412ead7a27bf11e747dadfa0ffcfb183f0c1759a101ce84cfebbd32a",
+          "details": {
+            "tokens": [
+              "UnknownGenre"
+            ]
+          }
+        }
+      ],
+      "normalized_field": [
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "normalize",
+          "reason": "normalized_field",
+          "count": 1,
+          "raw": "2841::  Stir of Echoes (1999)  ::Thriller",
+          "source_hash": "57c68a7bc010f81b5f2a635838b45f0c599d41b9ae189fa0e5ec3c5ff43d5087",
+          "details": {
+            "field": "title",
+            "before": "  Stir of Echoes (1999)  ",
+            "after": "Stir of Echoes (1999)"
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "normalize",
+          "reason": "normalized_field",
+          "count": 1,
+          "raw": "2022::  Last Temptation of Christ, The (1988)  ::Drama",
+          "source_hash": "8d69e0b04d71666666bcdd02a12c4f518c1afca0ac463ebffe4c0cd4a5bf6d62",
+          "details": {
+            "field": "title",
+            "before": "  Last Temptation of Christ, The (1988)  ",
+            "after": "Last Temptation of Christ, The (1988)"
+          }
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "normalize",
+          "reason": "normalized_field",
+          "count": 1,
+          "raw": "2771::  Brokedown Palace (1999)  ::Drama",
+          "source_hash": "536a687e4c34f6ae170f89f6cae643e13318d2fadc579349bd8d90a6ec7d8a7a",
+          "details": {
+            "field": "title",
+            "before": "  Brokedown Palace (1999)  ",
+            "after": "Brokedown Palace (1999)"
+          }
+        }
+      ],
+      "possible_mojibake": [
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "possible_mojibake",
+          "count": 1,
+          "raw": "3633::LÃ©on / AmÃ©lie (1994)::Action",
+          "source_hash": "f6f759a878db3304f5e9ba85392a29d1a642c225cf5ff7e7779d291e534733b1"
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "possible_mojibake",
+          "count": 1,
+          "raw": "2478::LÃ©on / AmÃ©lie (1994)::Comedy|Western",
+          "source_hash": "74c9c11f6a48f9a7b3311f8724e982ea6fe15c444604302a7d8dd2ecfe909e27"
+        },
+        {
+          "kind": "audit",
+          "table": "movies",
+          "action": "flag",
+          "reason": "possible_mojibake",
+          "count": 1,
+          "raw": "15::LÃ©on / AmÃ©lie (1994)::Action|Adventure|Romance",
+          "source_hash": "ff8883d0215151e99cc37614de2672a9dc87b729af14992c9d671ef4077a2f4e"
+        }
+      ],
+      "invalid_rating": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_rating",
+          "count": 1,
+          "raw": "4::2366::five::978294230",
+          "source_hash": "0c23964598fe0a62e36147443182edc7a68782d7bc3c6f0c3a759add936530bb"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_rating",
+          "count": 1,
+          "raw": "17::3246::3.5::978160129",
+          "source_hash": "dd4070e5bdc204db52c45633a5e59abe39e347fea64e85b90b1816ce8caefb42"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_rating",
+          "count": 1,
+          "raw": "26::2906::3.5::978146047",
+          "source_hash": "d5452928c1e37bcc42a541aacc0652d8d3bd534448489f5b933bc70e59804d57"
+        }
+      ],
+      "invalid_timestamp": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_timestamp",
+          "count": 1,
+          "raw": "9::50::4::",
+          "source_hash": "4645b3b7a9979a9c949ab8a4502582ac768e5e4c9b9dc74746cefc9837b88a2d"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_timestamp",
+          "count": 1,
+          "raw": "26::2423::2::4102444800",
+          "source_hash": "ac96b2d3ff67134864a647a41970b27fa35bd741451b452642e838d8bd1f5801"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_timestamp",
+          "count": 1,
+          "raw": "22::1034::4::991149472000",
+          "source_hash": "c66e60ec4c9e69b6a876bc4bbb3e3f4061e66c5582729c172c0dc3667d3ccc14"
+        }
+      ],
+      "unknown_user": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_user",
+          "count": 1,
+          "raw": "1011096::2174::1::978141688",
+          "source_hash": "dc7fbba0be3c00887f9eafb6d9a5f24824d3c59d3eee6985258cec540bd0ef55"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_user",
+          "count": 1,
+          "raw": "1011495::1201::2::978225853",
+          "source_hash": "560ff302cced5a3faf8e7280e3da1ae7f090b0f2fe43f27508694ee2593aacf3"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_user",
+          "count": 1,
+          "raw": "1009980::2021::2::978461604",
+          "source_hash": "5d8ae6139b5a656b59890afe0fa0de3c0a810a197c4595ce9945d6f35ff75c52"
+        }
+      ],
+      "unknown_movie": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_movie",
+          "count": 1,
+          "raw": "8::1006104::3::978230391",
+          "source_hash": "826714fae774d216ac969a7b5c1183a390187069865f5736fa77b9a66dfeb073"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_movie",
+          "count": 1,
+          "raw": "5::1013333::3::978243803",
+          "source_hash": "888c483cbd816d12898d4f26704c86c9bfad26c033029a0dacc2967c73729513"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "unknown_movie",
+          "count": 1,
+          "raw": "10::1008807::5::978227669",
+          "source_hash": "fd877d2aba06035ec46dc2376de76308a948f06b9730aae9171fb28d075c06be"
+        }
+      ],
+      "invalid_id": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_id",
+          "count": 1,
+          "raw": "::377::2::978153219",
+          "source_hash": "2387286280ebae78c019776b7a62419e76c25af3d72d4e9490da477cd82dcd05"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_id",
+          "count": 1,
+          "raw": "::3438::3::979168346",
+          "source_hash": "6503cd0d5f61d176e4a418c1a3bdae9206ae92fbba0a2ca49391e03a6bfe4715"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "invalid_id",
+          "count": 1,
+          "raw": "::2427::2::978212046",
+          "source_hash": "202e8cb0b0283c10bd3cc11fb46d632e47f590d86b4d07a916a74c962bd54c11"
+        }
+      ],
+      "same_event_conflicting_rating": [
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "same_event_conflicting_rating",
+          "count": 1,
+          "raw": "1::1::1::978824268",
+          "source_hash": "a590bbc25dd3f945c2e35c24fb2a396bbb25edb6c5f90c565f545a7de26e34d7"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "same_event_conflicting_rating",
+          "count": 1,
+          "raw": "1::1::1::978824268",
+          "source_hash": "a590bbc25dd3f945c2e35c24fb2a396bbb25edb6c5f90c565f545a7de26e34d7"
+        },
+        {
+          "kind": "audit",
+          "table": "ratings",
+          "action": "quarantine",
+          "reason": "same_event_conflicting_rating",
+          "count": 1,
+          "raw": "1::1::1::978824268",
+          "source_hash": "a590bbc25dd3f945c2e35c24fb2a396bbb25edb6c5f90c565f545a7de26e34d7"
+        }
+      ]
+    }
+  },
+  "jobs": {
+    "score_before": {
+      "job_id": "job_1790253639303_0005",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/score_before"
+    },
+    "clean": {
+      "job_id": "job_1790253639303_0006",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/process"
+    },
+    "export_clean": {
+      "job_id": "job_1790253639303_0007",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/cleaned"
+    },
+    "score_after": {
+      "job_id": "job_1790253639303_0008",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/score_after"
+    }
+  },
+  "hdfs_paths": {
+    "raw": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/raw",
+    "cleaned": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/cleaned",
+    "audit_and_process": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/process",
+    "score_before": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/score_before",
+    "score_after": "/user/awencat/ml1m/tasks/20260924T135305Z-95090600/score_after"
+  },
+  "local_clean_file": "/mnt/d/aaaeee/ziliao/大数据/文本2/BigData-lab2/runs/20260924T135305Z-95090600/cleaned.tsv"
+}

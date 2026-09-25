@@ -34,6 +34,10 @@ def source_hash(table: str, raw: str) -> str:
 
 
 def clean_dataset(raw_rows: dict[str, list[str]], emit: Emit, task_id: str) -> dict[str, Any]:
+    policy = RULES.get("processing_policy", {})
+    min_retained_rating = policy.get("min_retained_rating", 1)
+    missing_title_year_policy = policy.get("missing_title_year_policy", "flag")
+    policy_filtered_movies: set[int] = set()
     stats: dict[str, dict[str, Any]] = {}
     for table in FIELDS:
         stats[table] = {
@@ -108,6 +112,11 @@ def clean_dataset(raw_rows: dict[str, list[str]], emit: Emit, task_id: str) -> d
                         details={"field": field_name, "before": before, "after": after},
                     )
             values[0] = str(record_id)
+            if (table == "movies" and missing_title_year_policy == "quarantine"
+                    and (is_missing(values[1]) or not re.search(r"\([0-9]{4}\)$", values[1]))):
+                quarantine(table, "policy_missing_title_year", raw)
+                policy_filtered_movies.add(record_id)
+                continue
             if table == "users":
                 if values[1] not in GENDERS:
                     if not is_missing(values[1]):
@@ -221,7 +230,7 @@ def clean_dataset(raw_rows: dict[str, list[str]], emit: Emit, task_id: str) -> d
             quarantine("ratings", "unknown_user", raw)
             continue
         if movie_id not in clean_ids["movies"]:
-            quarantine("ratings", "unknown_movie", raw)
+            quarantine("ratings", "policy_filtered_movie_reference" if movie_id in policy_filtered_movies else "unknown_movie", raw)
             continue
         candidates.append((user_id, movie_id, timestamp, rating, raw, canonical))
 
@@ -237,6 +246,9 @@ def clean_dataset(raw_rows: dict[str, list[str]], emit: Emit, task_id: str) -> d
         if len({row[3] for row in group}) > 1:
             for row in group:
                 quarantine("ratings", "same_event_conflicting_rating", row[4])
+        elif first[3] < min_retained_rating:
+            for row in group:
+                quarantine("ratings", "policy_rating_below_minimum", row[4])
         else:
             stats["ratings"]["contributing"] += 1
             if len(group) > 1:
@@ -283,6 +295,8 @@ def clean_dataset(raw_rows: dict[str, list[str]], emit: Emit, task_id: str) -> d
         "task_id": task_id,
         "raw_data_version": RULES["raw_data_version"],
         "rule_version": RULES["rule_version"],
+        "processing_policy": {"min_retained_rating": min_retained_rating,
+                              "missing_title_year_policy": missing_title_year_policy},
         "tables": stats,
         "unresolved": dict(sorted(unresolved.items())),
         "T1": split["T1"],

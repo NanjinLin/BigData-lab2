@@ -21,12 +21,21 @@ from typing import Any
 
 
 PROJECT = Path(__file__).parent.parent
-HADOOP_HOME = Path("/opt/hadoop-3.5.0")
+sys.path.insert(0, str(PROJECT))
+from service.rules import RuleConfigError, validate_rules  # noqa: E402
+
+DEFAULT_HADOOP_HOME = Path("/opt/hadoop-3.5.0")
+if not DEFAULT_HADOOP_HOME.is_dir():
+    DEFAULT_HADOOP_HOME = Path.home() / ".local/opt/hadoop-3.5.0"
+HADOOP_HOME = Path(os.environ.get("ML1M_HADOOP_HOME", str(DEFAULT_HADOOP_HOME)))
 HADOOP = HADOOP_HOME / "bin" / "hadoop"
 HDFS = HADOOP_HOME / "bin" / "hdfs"
 STREAMING = HADOOP_HOME / "share/hadoop/tools/lib/hadoop-streaming-3.5.0.jar"
-CONF_DIR = "/home/linxinan/ml1m-hadoop-conf"
-HDFS_ROOT = "/user/linxinan/ml1m/tasks"
+DEFAULT_CONF_DIR = Path("/home/linxinan/ml1m-hadoop-conf")
+if not DEFAULT_CONF_DIR.is_dir():
+    DEFAULT_CONF_DIR = Path.home() / ".local/share/ml1m-hadoop/conf"
+CONF_DIR = os.environ.get("ML1M_HADOOP_CONF_DIR", str(DEFAULT_CONF_DIR))
+HDFS_ROOT = os.environ.get("ML1M_HDFS_ROOT", f"/user/{Path.home().name}/ml1m/tasks")
 
 
 def now() -> str:
@@ -41,9 +50,22 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_input() -> tuple[dict[str, Any], dict[str, Any]]:
+def verify_rules_file(path: Path, expected_sha256: str) -> dict[str, Any]:
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+        raise RuntimeError("Rule snapshot hash must be a lowercase SHA-256 digest")
+    if not path.is_file() or sha256(path) != expected_sha256:
+        raise RuntimeError("Rule snapshot hash mismatch or file missing")
+    try:
+        rules = json.loads(path.read_text(encoding="utf-8"))
+        return validate_rules(rules)
+    except (OSError, ValueError, RuleConfigError) as error:
+        raise RuntimeError(f"Invalid rule snapshot: {error}") from error
+
+
+def verify_input(rule_path: Path | None = None, rule_sha256: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = json.loads((PROJECT / "raw_data_manifest.json").read_text(encoding="utf-8"))
-    rules = json.loads((PROJECT / "config/quality_rules_v1.json").read_text(encoding="utf-8"))
+    selected_path = rule_path or PROJECT / "config/quality_rules_v1.json"
+    rules = verify_rules_file(selected_path, rule_sha256 or sha256(selected_path))
     if rules["raw_data_version"] != manifest["data_version"]:
         raise RuntimeError("Rule configuration is registered for a different raw data version")
     for name, entry in manifest["files"].items():
@@ -58,12 +80,20 @@ def verify_input() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 class Pipeline:
-    def __init__(self, task_id: str, manifest: dict[str, Any], rules: dict[str, Any]) -> None:
+    def __init__(self, task_id: str, manifest: dict[str, Any], rules: dict[str, Any],
+                 rule_path: Path, expected_rule_sha256: str) -> None:
         self.task_id = task_id
         self.manifest = manifest
         self.rules = rules
+        rule_bytes = rule_path.read_bytes()
+        if hashlib.sha256(rule_bytes).hexdigest() != expected_rule_sha256:
+            raise RuntimeError("Rule snapshot hash changed before pipeline start")
+        self.original_rule_path = rule_path
+        self.expected_rule_sha256 = expected_rule_sha256
         self.run_dir = PROJECT / "runs" / task_id
         self.run_dir.mkdir(parents=True, exist_ok=False)
+        self.rule_path = self.run_dir / "rules.json"
+        self.rule_path.write_bytes(rule_bytes)
         self.hdfs_root = f"{HDFS_ROOT}/{task_id}"
         self.jobs: dict[str, dict[str, Any]] = {}
         self.env = os.environ.copy()
@@ -71,6 +101,11 @@ class Pipeline:
         self.stage = "created"
         self.started_at = now()
         self.write_status("created")
+
+    def assert_snapshot_unchanged(self) -> None:
+        if (sha256(self.original_rule_path) != self.expected_rule_sha256
+                or sha256(self.rule_path) != self.expected_rule_sha256):
+            raise RuntimeError("Rule snapshot hash changed during pipeline execution")
 
     def write_status(self, state: str, **extra: Any) -> None:
         payload = {
@@ -87,6 +122,7 @@ class Pipeline:
         temporary.replace(self.run_dir / "status.json")
 
     def command(self, stage: str, args: list[str], *, capture: bool = False) -> str:
+        self.assert_snapshot_unchanged()
         self.stage = stage
         self.write_status("running")
         print(f"[{now()}] {stage}", flush=True)
@@ -102,6 +138,7 @@ class Pipeline:
             check=False,
         )
         log_path.write_text(completed.stdout, encoding="utf-8")
+        self.assert_snapshot_unchanged()
         if completed.returncode:
             tail = "\n".join(completed.stdout.splitlines()[-20:])
             raise RuntimeError(f"{stage} failed (exit {completed.returncode}):\n{tail}")
@@ -122,7 +159,7 @@ class Pipeline:
         elif reducer == "clean":
             files += [code_dir / "clean_reducer.py", code_dir / "quality.py"]
         if reducer is not None:
-            files.append(PROJECT / "config/quality_rules_v1.json")
+            files.append(f"{self.rule_path}#quality_rules_runtime.json")
         arguments = [
             str(HADOOP), "jar", str(STREAMING),
             "-D", f"mapreduce.job.name=ml1m-{self.task_id}-{stage}",
@@ -198,6 +235,8 @@ class Pipeline:
         after = single_record(after_file, "R")
         if before["kind"] != "raw" or after["kind"] != "clean":
             raise RuntimeError("Score jobs returned unexpected dataset kinds")
+        if any(item.get("rule_version") != self.rules["rule_version"] for item in (before, clean_report, after)):
+            raise RuntimeError("Hadoop jobs did not use the selected rule snapshot")
         for table, entry in self.manifest["files"].items():
             key = table.removesuffix(".dat")
             if before["tables"][key]["rows"] != entry["physical_lines"]:
@@ -223,6 +262,7 @@ class Pipeline:
             )
             for dimension in before["overall"]
         }
+        self.assert_snapshot_unchanged()
         report = {
             "task_id": self.task_id,
             "status": "completed",
@@ -230,7 +270,12 @@ class Pipeline:
             "completed_at": now(),
             "raw_data_version": self.manifest["data_version"],
             "rule_version": self.rules["rule_version"],
-            "rule_sha256": sha256(PROJECT / "config/quality_rules_v1.json"),
+            "rule_sha256": self.expected_rule_sha256,
+            "rule_parameters": {
+                "min_retained_rating": self.rules.get("processing_policy", {}).get("min_retained_rating", 1),
+                "missing_title_year_policy": self.rules.get("processing_policy", {}).get("missing_title_year_policy", "flag"),
+                "table_weights": self.rules.get("table_weights", {"ratings": 1, "users": 1, "movies": 1}),
+            },
             "code_sha256": code_hash.hexdigest(),
             "clean_data_version": "clean-" + clean_hash[:20],
             "clean_data_sha256": clean_hash,
@@ -272,12 +317,18 @@ def single_record(path: Path, expected_tag: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-id", help="Optional unique task ID for an external Agent")
+    parser.add_argument("--rules-file", type=Path, help="Frozen task-specific rule snapshot")
+    parser.add_argument("--rules-sha256", help="Expected SHA-256 for --rules-file")
     args = parser.parse_args()
     task_id = args.task_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", task_id):
         parser.error("task ID must be 1-80 ASCII letters, digits, underscores, or hyphens")
-    manifest, rules = verify_input()
-    pipeline = Pipeline(task_id, manifest, rules)
+    if bool(args.rules_file) != bool(args.rules_sha256):
+        parser.error("--rules-file and --rules-sha256 must be supplied together")
+    rule_path = args.rules_file or PROJECT / "config/quality_rules_v1.json"
+    expected_rule_sha256 = args.rules_sha256 or sha256(rule_path)
+    manifest, rules = verify_input(rule_path, expected_rule_sha256)
+    pipeline = Pipeline(task_id, manifest, rules, rule_path, expected_rule_sha256)
     try:
         report = pipeline.run()
     except Exception as error:

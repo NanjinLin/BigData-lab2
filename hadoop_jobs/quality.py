@@ -11,7 +11,9 @@ from typing import Any
 
 
 def load_rules() -> dict[str, Any]:
-    local = Path("quality_rules_v1.json")
+    local = Path("quality_rules_runtime.json")
+    if not local.exists():
+        local = Path("quality_rules_v1.json")
     if not local.exists():
         local = Path(__file__).resolve().parent.parent / "config" / "quality_rules_v1.json"
     return json.loads(local.read_text(encoding="utf-8"))
@@ -176,17 +178,20 @@ def score_dataset(rows: dict[str, list[str | list[str]]], kind: str) -> dict[str
         by_table[table] = {"rows": count, "metrics": metrics}
 
     overall: dict[str, float | None] = {}
+    table_weights = RULES.get("table_weights", {"ratings": 1, "users": 1, "movies": 1})
     for dimension in ("Accurate", "Complete", "Unique", "Consistent"):
         values = [
-            by_table[table]["metrics"][dimension]["score"]
+            (by_table[table]["metrics"][dimension]["score"], table_weights[table])
             for table in ("ratings", "users", "movies")
-            if by_table[table]["metrics"][dimension]["score"] is not None
+            if by_table[table]["metrics"][dimension]["score"] is not None and table_weights[table] > 0
         ]
-        overall[dimension] = sum(values) / len(values) if values else None
+        overall[dimension] = (sum(score * weight for score, weight in values) / sum(weight for _, weight in values)
+                              if values else None)
     overall["Up-to-date"] = by_table["ratings"]["metrics"]["Up-to-date"]["score"]
     return {
         "kind": kind,
         "rule_version": RULES["rule_version"],
+        "table_weights": table_weights,
         "overall": overall,
         "tables": by_table,
         "diagnostics": {

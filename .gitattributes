@@ -1,0 +1,2 @@
+# Preserve the registered MovieLens source bytes across Windows checkouts.
+ml-1m/ml-1m/*.dat -text

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MovieLens 数据治理 Agent</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="shell head"><div><p class="eyebrow">MovieLens 1M · 迭代一</p><h1>数据治理 Agent</h1><p>大模型选择默认或可调规则，Hadoop 执行清洗与五维质量评估</p></div><span class="badge">规则 v1.0.0 起</span></div>
+  </header>
+  <main class="shell">
+    <section class="card">
+      <h2>发起任务</h2>
+      <p class="muted">模型可直接执行登记的默认规则，或按明确请求调整最低保留评分（1–5）、标题缺少年份的处置和三表汇总权重。每次任务固定并登记具体参数；低分过滤是用户策略，不代表低分是错误。只处理完整 MovieLens 1M。单次运行可能需要约 9 分钟。</p>
+      <p id="model-status" class="note" role="status">正在检查模型配置…</p>
+      <form id="start-form"><label for="prompt">自然语言请求</label><textarea id="prompt" rows="3">请使用默认规则清洗 MovieLens 1M，评估清洗前后的五维数据质量，并说明异常处置和局限。</textarea><div class="actions"><button type="submit" id="start-button" disabled>开始清洗与评估</button><span id="form-message" role="status"></span></div></form>
+    </section>
+    <section class="card">
+      <div class="section-head"><div><h2>任务状态</h2><p class="muted" id="task-id">尚未选择任务</p></div><span id="state" class="state">待开始</span></div>
+      <p id="stage">可运行新任务，或打开已有报告。</p><p id="selected-rules" class="note"></p><p id="error" class="error" role="alert"></p>
+      <div class="actions"><label for="history">已有任务</label><select id="history"><option value="">选择任务</option></select><button type="button" class="secondary" id="refresh">刷新</button></div>
+      <div class="actions"><label for="task-lookup">按任务 ID 打开</label><input id="task-lookup" placeholder="粘贴任意已保存的任务 ID"><button type="button" class="secondary" id="open-task">打开报告</button></div>
+    </section>
+    <div id="results" hidden>
+      <section class="card"><div class="section-head"><h2>五维质量评分</h2><a id="download" class="button-link" href="#">下载本次报告</a></div><p class="muted">百分制；清洗前后使用同一规则和权重。变化单位为百分点。清洗后仅评价保留数据。</p><div class="table-wrap"><table><thead><tr><th>维度</th><th>清洗前</th><th>清洗后</th><th>变化</th></tr></thead><tbody id="scores"></tbody></table></div><p id="scoring-note" class="note"></p><details><summary>查看评分口径</summary><ul><li>准确性：字段存在且可检查值符合登记的取值域。</li><li>完整性：非空且非 <code>\N</code> 的期望字段槽位占比。</li><li>唯一性：不重复的完整业务行占比；不同时间的评分不算重复。</li><li>时效性：评分时间落在 2002-03-01 至 2003-02-28 UTC 的占比。</li><li>一致性：字段结构、数值格式、同 ID/事件和跨表引用均无矛盾的行占比。</li></ul><p id="aggregation-note"></p><p>准确性无法证明现实真实性；分数提升可能来自隔离，不能视作原始行被修复。详细分子分母见下载报告。</p></details></section>
+      <section class="card"><h2>数据量与处置</h2><div class="table-wrap"><table><thead><tr><th>表</th><th>输入</th><th>贡献/合并来源</th><th>去重</th><th>隔离</th><th>净表</th></tr></thead><tbody id="counts"></tbody></table></div><p class="note">贡献来源行与净表行可能不同：同 ID 的多条用户或电影记录可以合并。隔离和去重均不代表修复。</p><div id="reasons" class="chips"></div></section>
+      <section class="card"><h2>证据与局限</h2><div id="version" class="meta"></div><p id="period"></p><p id="limits" class="note"></p><h3>异常样例</h3><div id="audit" class="sample-grid"></div><h3>净表样例</h3><p id="sample-message" class="muted"></p><div id="samples" class="sample-grid"></div></section>
+      <section class="card"><h2>Agent 报告解读</h2><p class="muted">完成任务后，模型读取本次正式报告，解释五维变化、数据处置与尚未解决的问题。请对照上方数据核验。</p><p id="explanation" class="answer" aria-live="polite"></p></section>
+      <section class="card"><h2>追问本次报告</h2><p class="muted">模型会先调用报告工具读取所选任务的实际数据，再回答问题。可询问评分变化、异常原因、数据处置、时间切分及评价局限；报告没有依据的问题应明确说明。</p><form id="ask-form"><label for="question">问题</label><input id="question" placeholder="例如：电影去重了多少条？"><div class="actions"><button type="submit" id="ask-button" disabled>提问</button></div></form><p id="answer" class="answer" aria-live="polite"></p></section>
+    </div>
+  </main>
+  <footer class="shell">页面表格数值取自所选任务的正式报告；模型回答请对照报告核验。任务失败时不显示占位评分。</footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>
