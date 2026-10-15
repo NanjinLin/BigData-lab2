@@ -105,6 +105,14 @@ class TaskService:
             decision = self.agent.plan(prompt)
         except ModelError as error:
             raise TaskError(str(error), error.code) from error
+        return self.start_decision(prompt, decision)
+
+    def start_decision(self, prompt: str, decision: dict) -> dict:
+        """Execute one already selected, registered tool without a second model call."""
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 4000:
+            raise TaskError("任务请求必须是 1 至 4000 字的文本。", 400)
+        if not isinstance(decision, dict):
+            raise TaskError("模型决策无效。", 502)
         if not decision["accepted"]:
             raise TaskError(decision["reason"], 422)
         tool = decision.get("tool")

@@ -17,7 +17,7 @@ from service.tasks import TaskService
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REPORT = json.loads((ROOT / "runs/20260923T144724Z-3509cc23/report.json").read_text(encoding="utf-8"))
+REPORT = json.loads((ROOT / "runs/20260930T112146Z-b0d51382/report.json").read_text(encoding="utf-8"))
 
 
 class FakeModel:

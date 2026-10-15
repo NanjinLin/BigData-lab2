@@ -1,14 +1,23 @@
 {
-  "task_id": "20260924T140612Z-f547f8f0",
+  "task_id": "20260930T112146Z-b0d51382",
   "status": "completed",
-  "started_at": "2026-09-24T14:06:17Z",
-  "completed_at": "2026-09-24T14:13:55Z",
+  "started_at": "2026-09-30T11:21:52Z",
+  "completed_at": "2026-09-30T11:32:23Z",
   "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
   "rule_version": "quality-clean-v1.0.0",
   "rule_sha256": "59915ec6317ca500e2a44f845fe6245b6659d10d5f530460ea1ce14c5d73ddb3",
-  "code_sha256": "540e0f89996d0483b00f66162d3c441b471b6467d84751949954c8dccf45564e",
-  "clean_data_version": "clean-c91a5e196ca1af48c3da",
-  "clean_data_sha256": "c91a5e196ca1af48c3dae9d2f5a6d66164fd222931ba7d954426eb02df811fa7",
+  "rule_parameters": {
+    "min_retained_rating": 1,
+    "missing_title_year_policy": "flag",
+    "table_weights": {
+      "ratings": 1,
+      "users": 1,
+      "movies": 1
+    }
+  },
+  "code_sha256": "8e3a6d0942e4f69cdf8cd06ef8dd2c593bbfc978a460e7f279f008cff1648b60",
+  "clean_data_version": "clean-75365fb9d0bf69fc5ac7",
+  "clean_data_sha256": "75365fb9d0bf69fc5ac7182b5766dfe64e08016e7b70c4aa2645389f38ce75fe",
   "T1": "2000-12-01T23:59:59Z",
   "T2": "2000-12-28T23:59:59Z",
   "period_counts": {
@@ -19,6 +28,11 @@
   "quality_before": {
     "kind": "raw",
     "rule_version": "quality-clean-v1.0.0",
+    "table_weights": {
+      "ratings": 1,
+      "users": 1,
+      "movies": 1
+    },
     "overall": {
       "Accurate": 92.65506785746992,
       "Complete": 99.11282993487866,
@@ -117,6 +131,11 @@
   "quality_after": {
     "kind": "clean",
     "rule_version": "quality-clean-v1.0.0",
+    "table_weights": {
+      "ratings": 1,
+      "users": 1,
+      "movies": 1
+    },
     "overall": {
       "Accurate": 97.192582465272,
       "Complete": 98.89456673248624,
@@ -221,9 +240,13 @@
   },
   "cleaning": {
     "kind": "clean_report",
-    "task_id": "20260924T140612Z-f547f8f0",
+    "task_id": "20260930T112146Z-b0d51382",
     "raw_data_version": "raw-ml1m-r1b3c4690-uC0397B2E-mE256099E",
     "rule_version": "quality-clean-v1.0.0",
+    "processing_policy": {
+      "min_retained_rating": 1,
+      "missing_title_year_policy": "flag"
+    },
     "tables": {
       "ratings": {
         "input": 1150241,
@@ -843,28 +866,28 @@
   },
   "jobs": {
     "score_before": {
-      "job_id": "job_1790253639303_0009",
-      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/score_before"
+      "job_id": "job_1790765486780_0005",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/score_before"
     },
     "clean": {
-      "job_id": "job_1790253639303_0010",
-      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/process"
+      "job_id": "job_1790765486780_0006",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/process"
     },
     "export_clean": {
-      "job_id": "job_1790253639303_0011",
-      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/cleaned"
+      "job_id": "job_1790765486780_0007",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/cleaned"
     },
     "score_after": {
-      "job_id": "job_1790253639303_0012",
-      "hdfs_output": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/score_after"
+      "job_id": "job_1790765486780_0008",
+      "hdfs_output": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/score_after"
     }
   },
   "hdfs_paths": {
-    "raw": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/raw",
-    "cleaned": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/cleaned",
-    "audit_and_process": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/process",
-    "score_before": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/score_before",
-    "score_after": "/user/awencat/ml1m/tasks/20260924T140612Z-f547f8f0/score_after"
+    "raw": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/raw",
+    "cleaned": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/cleaned",
+    "audit_and_process": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/process",
+    "score_before": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/score_before",
+    "score_after": "/user/awencat/ml1m/tasks/20260930T112146Z-b0d51382/score_after"
   },
-  "local_clean_file": "/mnt/d/aaaeee/ziliao/大数据/文本2/BigData-lab2/runs/20260924T140612Z-f547f8f0/cleaned.tsv"
+  "local_clean_file": "/mnt/d/aaaeee/ziliao/大数据/文本2/小组/项目源码/runs/20260930T112146Z-b0d51382/cleaned.tsv"
 }

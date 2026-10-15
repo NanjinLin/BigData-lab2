@@ -20,8 +20,8 @@ fi
 source "$HADOOP_CONF_DIR/hadoop-env.sh"
 mkdir -p "$HOME/.local/share/ml1m-hadoop/logs"
 
-if "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
-   "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
+if timeout 6 "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
+   timeout 6 "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
   echo "HDFS and YARN are already ready."
   exit 0
 fi
@@ -43,13 +43,13 @@ for spec in \
   fi
 done
 
-for attempt in $(seq 1 30); do
-  if "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
-     "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
+for attempt in $(seq 1 15); do
+  if timeout 6 "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
+     timeout 6 "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
     echo "HDFS and YARN are ready."
     exit 0
   fi
   sleep 2
 done
-echo "HDFS or YARN did not become ready within 60 seconds." >&2
+echo "HDFS or YARN did not become ready after 15 bounded checks." >&2
 exit 1

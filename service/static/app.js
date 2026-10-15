@@ -1,16 +1,19 @@
 const $ = (id) => document.getElementById(id);
-const dimensions = ["Accurate", "Complete", "Unique", "Up-to-date", "Consistent"];
-const labels = {Accurate:"准确性",Complete:"完整性",Unique:"唯一性","Up-to-date":"时效性",Consistent:"一致性"};
-const tables = {ratings:"评分",users:"用户",movies:"电影"};
-const reasons = {policy_rating_below_minimum:"低于用户指定的最低保留评分",policy_missing_title_year:"按用户策略隔离缺少年份的电影记录",policy_filtered_movie_reference:"引用被策略过滤电影的评分"};
-const stages = {waiting_for_worker:"等待启动",starting_pipeline:"准备运行环境",check_hdfs:"检查 HDFS",check_yarn:"检查 YARN",create_raw_dir:"创建原始数据目录",score_before:"清洗前评分",clean:"执行清洗",export_clean:"导出净表",score_after:"清洗后评分",download_score_before:"下载清洗前评分",download_clean_process:"下载清洗与审计结果",download_cleaned:"下载净表",download_score_after:"下载清洗后评分",completed:"完成",historical_report:"历史报告",startup:"启动失败"};
-let currentTask = null;
-let pollTimer = null;
-let selectionToken = 0;
-let questionToken = 0;
-let modelConfigured = false;
-const explanationCache = new Map();
-const explanationQuestion = "请根据本次正式报告解释五维评分的主要变化、清洗解决的问题、修复与去重及隔离造成的数据量变化，并说明仍未解决的问题和评分局限。若有用户策略过滤，请与无效数据区分。只引用报告证据。";
+const dimensionNames = {Accurate:"准确性",Complete:"完整性",Unique:"唯一性","Up-to-date":"时效性",Consistent:"一致性"};
+const tableNames = {ratings:"评分",users:"用户",movies:"电影"};
+const stateNames = {created:"准备中",queued:"排队中",running:"运行中",completed:"已完成",failed:"失败",unknown:"状态不明"};
+const stageNames = {waiting_for_worker:"等待启动",starting_pipeline:"准备运行环境",check_hdfs:"检查 HDFS",check_yarn:"检查 YARN",create_raw_dir:"创建原始数据目录",score_before:"清洗前评分",clean:"清洗数据",export_clean:"导出净表",score_after:"清洗后评分",download_score_before:"下载清洗前结果",download_clean_process:"下载审计结果",download_cleaned:"下载净表",download_score_after:"下载清洗后结果",completed:"完成",historical_report:"历史报告",startup:"启动失败"};
+const reasonNames = {policy_rating_below_minimum:"低于最低保留评分",policy_missing_title_year:"标题缺少年份",policy_filtered_movie_reference:"引用被过滤电影"};
+let activeChatId = null;
+let selectedTaskId = null;
+let configured = false;
+let sending = false;
+let inspectorRequest = 0;
+let statusTimer = null;
+let navigationToken = 0;
+let taskSelectionToken = 0;
+let inspectorState = null;
+const reportCache = new Map();
 
 async function api(path, options = {}) {
   const response = await fetch(path, options);
@@ -19,186 +22,255 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error || `请求失败（HTTP ${response.status}）`);
   return data;
 }
-function fmt(value) { return value == null ? "无法评价" : Number(value).toFixed(2); }
-function int(value) { return Number(value).toLocaleString("zh-CN"); }
-function clear(node) { node.replaceChildren(); }
-function cell(row, content) { const td = document.createElement("td"); td.textContent = content; row.append(td); }
-function ruleSummary(options) {
-  const config = options || {min_retained_rating:1,missing_title_year_policy:"flag",table_weights:{ratings:1,users:1,movies:1}};
-  const weights = config.table_weights;
-  return `最低保留评分 ${config.min_retained_rating}；标题缺少年份：${config.missing_title_year_policy === "quarantine" ? "隔离" : "保留并标记"}；汇总权重 评分:用户:电影 = ${weights.ratings}:${weights.users}:${weights.movies}`;
+function jsonOptions(method, body) { return {method, headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}; }
+function node(tag, className, value) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (value !== undefined) element.textContent = String(value);
+  return element;
 }
-function setStatus(status) {
-  $("task-id").textContent = `任务 ID：${status.task_id}`;
-  $("state").textContent = ({queued:"排队中",running:"执行中",created:"准备中",completed:"已完成",failed:"失败",unknown:"状态不明"})[status.state] || status.state;
-  $("state").className = `state ${status.state}`;
-  $("stage").textContent = `当前阶段：${stages[status.stage] || status.stage || "未知"}；更新时间：${status.updated_at || "未记录"}`;
-  $("selected-rules").textContent = status.agent ? `本次执行参数：${ruleSummary(status.agent.options)}；规则版本 ${status.agent.rule_version}` : "";
-  $("error").textContent = status.error || "";
-  $("results").hidden = true;
-  $("start-button").disabled = !modelConfigured || ["queued","running","created"].includes(status.state);
+function number(value) { return Number(value ?? 0).toLocaleString("zh-CN"); }
+function score(value) { return value == null ? "无法评价" : Number(value).toFixed(2); }
+function statusText(status) { return stateNames[status.state] || status.state || "未知"; }
+function scrollBottom() { $("chat-scroll").scrollTo({top:$("chat-scroll").scrollHeight,behavior:"smooth"}); }
+function setWelcome() { $("welcome").hidden = $("messages").children.length > 0; }
+function closeMobileMenu() { $("sidebar").classList.remove("is-open"); $("mobile-backdrop").hidden = true; }
+function updateContext() {
+  $("context-label").textContent = selectedTaskId ? `当前任务 · ${selectedTaskId}` : "与你的数据分析助手交流";
 }
-function renderReport(report, taskId, agentMetadata) {
-  const parameters = report.rule_parameters || {min_retained_rating:1,missing_title_year_policy:"flag",table_weights:{ratings:1,users:1,movies:1}};
-  clear($("scores"));
-  for (const dimension of dimensions) {
-    const row = document.createElement("tr");
-    cell(row, `${labels[dimension]} · ${dimension}`);
-    cell(row, fmt(report.quality_before.overall[dimension]));
-    cell(row, fmt(report.quality_after.overall[dimension]));
-    const delta = report.quality_delta[dimension];
-    cell(row, delta == null ? "无法评价" : `${delta >= 0 ? "+" : ""}${fmt(delta)}`);
-    $("scores").append(row);
+
+function renderMessage(message, {pending=false,error=false} = {}) {
+  const row = node("div", `message ${message.role}${pending ? " pending" : ""}${error ? " error" : ""}`);
+  if (message.role === "user") {
+    row.append(node("div", "message-content", message.content));
+  } else {
+    row.append(node("div", "assistant-avatar", "M"));
+    const content = node("div", "assistant-content");
+    if (pending || error) content.textContent = message.content;
+    else renderModelAnswer(content, {answer:message.content,model:message.model,model_response_id:message.model_response_id,evidence:message.evidence});
+    if (message.task_id) content.append(taskInline(message.task_id));
+    row.append(content);
   }
-  $("scoring-note").textContent = `本次 ${ruleSummary(parameters)}。准确性是可检查值的合法性代理分；时效性只评价评分表，以数据发布时期的固定历史窗口为参照。无综合分。`;
-  $("aggregation-note").textContent = `除时效性外，四个维度先逐表评分，再按本次 评分:用户:电影 = ${parameters.table_weights.ratings}:${parameters.table_weights.users}:${parameters.table_weights.movies} 汇总非空且权重大于零的表。`;
-  clear($("counts")); clear($("reasons"));
-  for (const [name, data] of Object.entries(report.cleaning.tables)) {
-    const row = document.createElement("tr");
-    [tables[name] || name, int(data.input), int(data.contributing), int(data.duplicate), int(data.quarantine), int(data.output)].forEach(value => cell(row, value));
-    $("counts").append(row);
-    for (const [reason, count] of Object.entries(data.reasons || {})) {
-      const chip = document.createElement("span"); chip.className = "chip";
-      chip.textContent = `${tables[name] || name} · ${reasons[reason] || reason}: ${int(count)}`;
-      $("reasons").append(chip);
+  $("messages").append(row);
+  setWelcome();
+  return row;
+}
+function taskInline(taskId) {
+  const button = node("button", "task-inline");
+  button.type = "button";
+  button.append(node("span", "status-dot running"));
+  const words = node("span");
+  words.append(node("strong", "", "数据处理任务"), node("small", "", taskId));
+  button.append(words, node("span", "", "查看 →"));
+  button.addEventListener("click", () => selectTask(taskId, true));
+  return button;
+}
+
+async function loadChats() {
+  const chats = await api("/api/conversations");
+  const list = $("chat-list"); list.replaceChildren();
+  if (!chats.length) list.append(node("div", "nav-empty", "还没有对话"));
+  for (const chat of chats) {
+    const item = node("button", `nav-item${chat.id === activeChatId ? " active" : ""}`);
+    item.type = "button"; item.title = chat.title;
+    item.append(node("span", "item-icon", "◫"), node("span", "item-label", chat.title));
+    item.addEventListener("click", () => showChat(chat.id));
+    list.append(item);
+  }
+}
+async function newChat() {
+  const chat = await api("/api/conversations", jsonOptions("POST", {}));
+  await showChat(chat.id);
+  closeMobileMenu();
+  $("message-input").focus();
+}
+async function showChat(id) {
+  const token = ++navigationToken;
+  const chat = await api(`/api/conversations/${encodeURIComponent(id)}`);
+  if (token !== navigationToken) return;
+  activeChatId = chat.id;
+  selectedTaskId = chat.selected_task_id || null;
+  sessionStorage.setItem("movielens-active-chat", chat.id);
+  $("conversation-title").textContent = chat.title;
+  updateContext();
+  $("messages").replaceChildren();
+  for (const item of chat.messages) renderMessage(item);
+  setWelcome(); scrollBottom();
+  await loadChats();
+  await loadTasks();
+  closeMobileMenu();
+}
+
+async function loadTasks() {
+  const tasks = await api("/api/tasks");
+  const list = $("task-list"); list.replaceChildren();
+  if (!tasks.length) list.append(node("div", "nav-empty", "还没有处理任务"));
+  for (const task of tasks.slice(0, 30)) {
+    const item = node("button", `nav-item${task.task_id === selectedTaskId ? " active" : ""}`);
+    item.type = "button"; item.title = `${task.task_id} · ${statusText(task)}`;
+    item.append(node("span", "item-icon", "▦"),node("span", "item-label", task.task_id),node("span", `status-dot ${task.state}`));
+    item.addEventListener("click", () => selectTask(task.task_id, true));
+    list.append(item);
+  }
+}
+async function selectTask(taskId, open) {
+  const token = ++taskSelectionToken;
+  const chatToken = navigationToken;
+  try {
+    await api(`/api/tasks/${encodeURIComponent(taskId)}`);
+  } catch (error) {
+    if (open && token === taskSelectionToken && chatToken === navigationToken) {
+      openInspector();
+      $("inspector-title").textContent = taskId;
+      $("inspector-body").replaceChildren(node("div", "empty-inspector", error.message));
     }
-  }
-  clear($("version"));
-  for (const [label, value] of [["原始数据版本",report.raw_data_version],["清洗规则版本",report.rule_version],["规则快照 SHA-256",report.rule_sha256 || "历史报告未记录"],["净表版本",report.clean_data_version],["净表 SHA-256",report.clean_data_sha256]]) {
-    const item = document.createElement("div"); item.textContent = `${label}：${value}`; $("version").append(item);
-  }
-  const trace = document.createElement("div");
-  trace.textContent = agentMetadata ? `模型决策：${agentMetadata.model} · 响应 ${agentMetadata.model_response_id}` : "历史任务：无大模型决策记录";
-  $("version").append(trace);
-  const p = report.period_counts;
-  $("period").textContent = `T1 = ${report.T1}；T2 = ${report.T2}。训练 ${int(p.train)}，验证 ${int(p.validation)}，测试 ${int(p.test)} 条。`;
-  const u = report.cleaning.unresolved;
-  const strictYear = report.cleaning.tables.movies.reasons?.policy_missing_title_year || 0;
-  const lowRating = report.cleaning.tables.ratings.reasons?.policy_rating_below_minimum || 0;
-  $("limits").textContent = `仍待核验：疑似乱码标题 ${int(u.possible_mojibake || 0)}，保留的年份异常 ${int(u.missing_title_year || 0)}，非典型邮编 ${int(u.non_us_zip_pattern || 0)}。按策略隔离缺少年份的电影原始行 ${int(strictYear)}，过滤合法低分评分 ${int(lowRating)}。用户自填属性和电影内容的真实性无法仅靠数据内部规则确认。`;
-  clear($("audit"));
-  for (const [reason, samples] of Object.entries(report.cleaning.audit_samples || {})) {
-    if (!samples.length) continue;
-    const example = samples[0]; const card = document.createElement("div"); card.className = "sample";
-    const title = document.createElement("strong"); title.textContent = `${tables[example.table] || example.table} · ${reason} · ${example.action}`;
-    const body = document.createElement("pre"); body.textContent = example.raw || JSON.stringify(example.details || {});
-    card.append(title, body); $("audit").append(card);
-  }
-  $("download").href = `/api/tasks/${encodeURIComponent(taskId)}/report?download=1`;
-}
-async function renderSamples(taskId, token) {
-  const data = await api(`/api/tasks/${encodeURIComponent(taskId)}/samples`);
-  if (token !== selectionToken) return;
-  clear($("samples"));
-  $("sample-message").textContent = data.state === "available" ? `来自净表版本 ${data.clean_data_version} 的前 ${data.rows.length} 条记录。` : data.reason;
-  for (const row of data.rows) {
-    const card = document.createElement("div"); card.className = "sample";
-    const title = document.createElement("strong"); title.textContent = tables[row.table] || row.table;
-    const body = document.createElement("pre"); body.textContent = JSON.stringify(row.fields, null, 2);
-    card.append(title, body); $("samples").append(card);
-  }
-}
-async function renderExplanation(taskId, token) {
-  if (!modelConfigured) {
-    $("explanation").textContent = "请按页面上方的模型状态提示配置或重启服务后生成报告解读。";
     return;
   }
-  $("explanation").textContent = "模型正在读取并解读本次报告…";
-  let request = explanationCache.get(taskId);
-  if (!request) {
-    request = api(`/api/tasks/${encodeURIComponent(taskId)}/ask`, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({question:explanationQuestion})
-    });
-    explanationCache.set(taskId, request);
-  }
-  try {
-    const result = await request;
-    if (token === selectionToken) $("explanation").textContent = `${result.answer}（模型：${result.model}；响应：${result.model_response_id || "未记录"}；依据：本次 report.json）`;
-  } catch (error) {
-    explanationCache.delete(taskId);
-    if (token === selectionToken) $("explanation").textContent = `报告解读失败：${error.message}`;
-  }
+  if (token !== taskSelectionToken || chatToken !== navigationToken) return;
+  selectedTaskId = taskId;
+  updateContext();
+  await loadTasks();
+  if (open) openInspector();
+  await renderInspector(taskId);
+  closeMobileMenu();
 }
-async function showTask(taskId) {
-  const token = ++selectionToken;
-  ++questionToken;
-  currentTask = taskId;
-  clearTimeout(pollTimer);
-  $("results").hidden = true;
-  $("answer").textContent = "";
-  $("explanation").textContent = "";
-  $("sample-message").textContent = "";
-  $("task-id").textContent = `任务 ID：${taskId}`;
-  $("stage").textContent = "正在读取任务状态…";
-  $("error").textContent = "";
+function openInspector() { $("inspector").classList.add("is-open"); $("inspector").setAttribute("aria-hidden","false"); }
+function closeInspector() { $("inspector").classList.remove("is-open"); $("inspector").setAttribute("aria-hidden","true"); }
+function section(title) { const container=node("section","detail-section");container.append(node("h3","",title));return container; }
+function stat(label,value,full=false) { const box=node("div",`detail-stat${full?" full":""}`);box.append(node("small","",label),node("strong","",value));return box; }
+function detailRow(label,value) { const row=node("div","detail-row");row.append(node("b","",label),node("span","",value));return row; }
+function table(headers,rows) {
+  const wrap=node("div","detail-table-wrap"), t=node("table","detail-table"), head=node("thead"), hr=node("tr");
+  headers.forEach(x=>hr.append(node("th","",x)));head.append(hr);t.append(head);
+  const body=node("tbody"); for(const values of rows){const tr=node("tr");values.forEach(x=>tr.append(node("td","",x)));body.append(tr);}t.append(body);wrap.append(t);return wrap;
+}
+function addAction(parent,label,handler) { const button=node("button","",label);button.type="button";button.addEventListener("click",handler);parent.append(button); }
+
+async function renderInspector(taskId) {
+  const token=++inspectorRequest;
+  $("inspector-title").textContent=taskId;
+  $("inspector-body").replaceChildren(node("div","empty-inspector","正在读取任务状态…"));
   try {
-    const status = await api(`/api/tasks/${encodeURIComponent(taskId)}`);
-    if (token !== selectionToken) return;
-    setStatus(status);
-    if (status.state === "completed") {
-      const report = await api(`/api/tasks/${encodeURIComponent(taskId)}/report`);
-      if (token !== selectionToken) return;
-      renderReport(report, taskId, status.agent);
-      $("results").hidden = false;
-      await renderSamples(taskId, token);
-      void renderExplanation(taskId, token);
-    } else if (["queued","running","created"].includes(status.state)) {
-      pollTimer = setTimeout(() => { if (token === selectionToken) showTask(taskId); }, 2500);
+    const status=await api(`/api/tasks/${encodeURIComponent(taskId)}`);
+    if(token!==inspectorRequest)return;
+    inspectorState={taskId,state:status.state,stage:status.stage};
+    const body=$("inspector-body");body.replaceChildren();
+    const banner=node("div",`status-banner${status.state==="failed"?" failed":""}`,
+      `${statusText(status)} · ${stageNames[status.stage]||status.stage||"阶段未记录"}${status.error?`\n${status.error}`:""}`);
+    body.append(banner);
+    const actions=node("div","detail-section detail-actions");
+    addAction(actions,"在对话中询问此任务",()=>{closeInspector();$("message-input").focus();});
+    if(status.state==="completed"){
+      const link=node("a","","下载完整 JSON 报告");link.href=`/api/tasks/${encodeURIComponent(taskId)}/report?download=1`;actions.append(link);
+      addAction(actions,"让 Agent 解读报告",()=>{closeInspector();sendMessage("请根据当前任务的正式报告解释五维评分变化、数据处置及仍未解决的问题，并说明结论的局限。")});
     }
-  } catch (error) { if (token === selectionToken) $("error").textContent = error.message; }
-}
-async function loadHistory() {
-  try {
-    const tasks = await api("/api/tasks");
-    const selector = $("history"); clear(selector);
-    const blank = document.createElement("option"); blank.value = ""; blank.textContent = "选择任务"; selector.append(blank);
-    for (const task of tasks) {
-      const option = document.createElement("option"); option.value = task.task_id;
-      option.textContent = `${task.task_id} · ${task.state}`; selector.append(option);
+    body.append(actions);
+    if(status.agent){const s=section("本次执行配置");s.append(detailRow("使用工具",status.agent.tool||"未记录"));s.append(detailRow("规则版本",status.agent.rule_version||"未记录"));if(status.agent.options)s.append(detailRow("规则参数",JSON.stringify(status.agent.options)));body.append(s);}
+    if(status.state!=="completed")return;
+    let report=reportCache.get(taskId);
+    if(!report){report=await api(`/api/tasks/${encodeURIComponent(taskId)}/report`);reportCache.set(taskId,report);}
+    if(token!==inspectorRequest)return;
+    const scores=section("五维质量评分");
+    scores.append(table(["维度","清洗前","清洗后","变化"],Object.entries(dimensionNames).map(([key,name])=>[name,score(report.quality_before?.overall?.[key]),score(report.quality_after?.overall?.[key]),report.quality_delta?.[key]==null?"—":`${report.quality_delta[key]>=0?"+":""}${score(report.quality_delta[key])}`])));
+    scores.append(node("p","detail-note","百分制；同一规则下对保留数据重新评分。详细分子分母见完整报告。"));body.append(scores);
+    const counts=section("数据量与处置");
+    counts.append(table(["表","输入","贡献","去重","隔离","净表"],Object.entries(report.cleaning?.tables||{}).map(([name,data])=>[tableNames[name]||name,number(data.input),number(data.contributing),number(data.duplicate),number(data.quarantine),number(data.output)])));
+    counts.append(node("p","detail-note","贡献来源行与净表行可能不同；去重和隔离不代表修复。"));body.append(counts);
+    const reasons=section("异常及策略原因"), reasonsList=node("div","reason-list");
+    for(const [name,data] of Object.entries(report.cleaning?.tables||{}))for(const [key,value] of Object.entries(data.reasons||{})){
+      const row=node("div","reason-item");row.append(node("span","",`${tableNames[name]||name} · ${reasonNames[key]||key}`),node("strong","",number(value)));reasonsList.append(row);
     }
-    if (currentTask) selector.value = currentTask;
-  } catch (error) { $("form-message").textContent = error.message; }
+    reasons.append(reasonsList);body.append(reasons);
+    const versions=section("来源、版本和时间"), grid=node("div","detail-grid");
+    for(const [label,value] of [["原始数据版本",report.raw_data_version],["规则版本",report.rule_version],["净表版本",report.clean_data_version],["净表 SHA-256",report.clean_data_sha256],["T1",report.T1],["T2",report.T2]])grid.append(stat(label,value||"未记录",true));
+    versions.append(grid);const periods=report.period_counts||{};versions.append(node("p","detail-note",`训练 ${number(periods.train)} · 验证 ${number(periods.validation)} · 测试 ${number(periods.test)}`));body.append(versions);
+    const limits=section("仍需核验"), unresolved=report.cleaning?.unresolved||{};
+    limits.append(node("p","detail-note",`疑似乱码标题 ${number(unresolved.possible_mojibake)}；年份异常 ${number(unresolved.missing_title_year)}；非典型邮编 ${number(unresolved.non_us_zip_pattern)}。数据内部规则不能验证现实真实性。`));body.append(limits);
+    const audits=section("审计样例"), list=node("div","detail-list");
+    for(const [reason,items] of Object.entries(report.cleaning?.audit_samples||{})){
+      if(!items?.length)continue;const sample=items[0],row=node("div","detail-row");row.append(node("b","",`${tableNames[sample.table]||sample.table} · ${reason} · ${sample.action}`),node("pre","",sample.raw||JSON.stringify(sample.details||{})));list.append(row);
+    }audits.append(list);body.append(audits);
+    const sampleSection=section("净表样例"), sampleList=node("div","detail-list");
+    try{const samples=await api(`/api/tasks/${encodeURIComponent(taskId)}/samples`);if(token!==inspectorRequest)return;
+      if(samples.state==="available")for(const item of samples.rows){const row=node("div","detail-row");row.append(node("b","",tableNames[item.table]||item.table),node("pre","",JSON.stringify(item.fields)));sampleList.append(row);}
+      else sampleList.append(node("p","detail-note",samples.reason||"本地净表不可用。"));
+    }catch(error){sampleList.append(node("p","detail-note",error.message));}
+    sampleSection.append(sampleList);body.append(sampleSection);
+  }catch(error){if(token===inspectorRequest)$("inspector-body").replaceChildren(node("div","empty-inspector",error.message));}
 }
-async function loadAgentConfig() {
-  try {
-    const config = await api("/api/agent");
-    const currentVersion = Array.isArray(config.capabilities) && config.capabilities.includes("run_hadoop_with_adjusted_rules");
-    modelConfigured = Boolean(config.configured && currentVersion);
-    $("model-status").textContent = !currentVersion
-      ? "检测到旧版服务进程：请停止旧服务，并在已配置 API Key 的终端重新运行 python -m service.app。历史报告仍可浏览。"
-      : config.configured
-        ? `模型已配置：${config.model}。任务选择和报告追问会调用 ${config.provider}。`
-        : "模型尚未配置：请在服务端设置 OPENAI_API_KEY 后重启服务。当前仍可查看历史报告。";
-    $("start-button").disabled = !modelConfigured || ["queued","running","created"].includes($("state").classList[1]);
-    $("ask-button").disabled = !modelConfigured;
-  } catch (error) { $("model-status").textContent = `无法读取模型配置：${error.message}`; }
+
+async function loadConfig() {
+  const config=await api("/api/model-config");configured=Boolean(config.configured);
+  $("model-pill").textContent=configured?config.model:"模型未配置";
+  $("model-pill").classList.toggle("unconfigured",!configured);
+  $("side-config-dot").classList.toggle("ready",configured);
+  $("setting-model").value=config.model||"";
+  $("setting-url").value=config.base_url||"https://api.openai.com/v1";
+  $("setting-key").value="";
+  $("key-state").textContent=config.key_present?"已设置 Key；留空可沿用当前 Key":"尚未设置 Key";
+  return config;
 }
-$("start-form").addEventListener("submit", async (event) => {
-  event.preventDefault(); $("form-message").textContent = "正在提交…";
-  try {
-    const task = await api("/api/tasks", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:$("prompt").value})});
-    $("form-message").textContent = "任务已创建。";
-    currentTask = task.task_id;
-    await loadHistory(); await showTask(task.task_id);
-  } catch (error) { $("form-message").textContent = error.message; }
-});
-$("history").addEventListener("change", (event) => { if (event.target.value) showTask(event.target.value); });
-$("open-task").addEventListener("click", () => {
-  const taskId = $("task-lookup").value.trim();
-  if (taskId) showTask(taskId);
-});
-$("refresh").addEventListener("click", () => { loadHistory(); if (currentTask) showTask(currentTask); });
-$("ask-form").addEventListener("submit", async (event) => {
-  event.preventDefault(); if (!currentTask) return;
-  const taskId = currentTask;
-  const token = selectionToken;
-  const request = ++questionToken;
-  $("answer").textContent = "正在查询…";
-  try {
-    const result = await api(`/api/tasks/${encodeURIComponent(taskId)}/ask`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:$("question").value})});
-    if (token === selectionToken && request === questionToken) $("answer").textContent = `${result.answer}（模型：${result.model}；响应：${result.model_response_id || "未记录"}；依据：本次 report.json）`;
-  } catch (error) { if (token === selectionToken && request === questionToken) $("answer").textContent = error.message; }
-});
-loadHistory();
-loadAgentConfig();
+async function openSettings() { await loadConfig();$("settings-error").textContent="";if(!$("settings-dialog").open)$("settings-dialog").showModal(); }
+function closeSettings() { $("settings-dialog").close();$("setting-key").value=""; }
+async function saveSettings(event) {
+  event.preventDefault();$("settings-error").textContent="";$("save-settings").disabled=true;
+  try{
+    await api("/api/model-config",jsonOptions("PUT",{model:$("setting-model").value.trim(),base_url:$("setting-url").value.trim(),api_key:$("setting-key").value}));
+    await loadConfig();closeSettings();
+  }catch(error){$("settings-error").textContent=error.message;}
+  finally{$("save-settings").disabled=false;}
+}
+
+async function sendMessage(value) {
+  const text=(value??$("message-input").value).trim();
+  if(!text||sending)return;
+  if(!configured){await openSettings();return;}
+  sending=true;$("send-button").disabled=true;$("message-input").value="";resizeComposer();
+  try{
+    if(!activeChatId){const chat=await api("/api/conversations",jsonOptions("POST",{}));activeChatId=chat.id;sessionStorage.setItem("movielens-active-chat",chat.id);}
+    const sentChatId=activeChatId;
+    const sentTaskId=selectedTaskId;
+    const optimistic=renderMessage({role:"user",content:text});
+    const pending=renderMessage({role:"assistant",content:"正在思考并检查可用工具…"},{pending:true});scrollBottom();
+    try{
+      const result=await api(`/api/conversations/${encodeURIComponent(sentChatId)}/messages`,jsonOptions("POST",{message:text,task_id:sentTaskId}));
+      if(activeChatId===sentChatId){
+        pending.remove();renderMessage(result.message);selectedTaskId=result.selected_task_id||null;
+        $("conversation-title").textContent=result.title;updateContext();
+      }
+      await loadChats();await loadTasks();
+      if(result.message.task_id&&activeChatId===sentChatId)void renderInspector(result.message.task_id);
+    }catch(error){
+      if(activeChatId===sentChatId){pending.remove();optimistic.remove();renderMessage({role:"assistant",content:`请求未完成：${error.message}`},{error:true});if(!$("message-input").value)$("message-input").value=text;}
+    }
+  }catch(error){renderMessage({role:"assistant",content:`无法创建对话：${error.message}`},{error:true});$("message-input").value=text;}
+  finally{sending=false;$("send-button").disabled=false;scrollBottom();$("message-input").focus();}
+}
+function resizeComposer(){const input=$("message-input");input.style.height="auto";input.style.height=`${Math.min(input.scrollHeight,160)}px`;}
+
+$("new-chat").addEventListener("click",()=>void newChat());
+$("refresh-chats").addEventListener("click",()=>void loadChats());
+$("refresh-tasks").addEventListener("click",()=>void loadTasks());
+$("menu-toggle").addEventListener("click",()=>{$("sidebar").classList.add("is-open");$("mobile-backdrop").hidden=false;});
+$("mobile-backdrop").addEventListener("click",closeMobileMenu);
+$("open-inspector").addEventListener("click",()=>{openInspector();if(selectedTaskId)void renderInspector(selectedTaskId);});
+$("close-inspector").addEventListener("click",closeInspector);
+$("task-lookup-form").addEventListener("submit",event=>{event.preventDefault();const id=$("task-lookup").value.trim();if(id)void selectTask(id,true);});
+$("composer").addEventListener("submit",event=>{event.preventDefault();void sendMessage();});
+$("message-input").addEventListener("input",resizeComposer);
+$("message-input").addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){event.preventDefault();void sendMessage();}});
+for(const suggestion of document.querySelectorAll("[data-prompt]"))suggestion.addEventListener("click",()=>void sendMessage(suggestion.dataset.prompt));
+for(const button of [$("open-settings"),$("sidebar-settings")])button.addEventListener("click",()=>void openSettings());
+$("close-settings").addEventListener("click",closeSettings);
+$("cancel-settings").addEventListener("click",closeSettings);
+$("settings-form").addEventListener("submit",saveSettings);
+$("toggle-key").addEventListener("click",()=>{const input=$("setting-key");input.type=input.type==="password"?"text":"password";$("toggle-key").textContent=input.type==="password"?"显示":"隐藏";});
+$("clear-key").addEventListener("click",async()=>{try{await api("/api/model-config",{method:"DELETE"});await loadConfig();$("settings-error").textContent="Key 已从服务进程中移除。";}catch(error){$("settings-error").textContent=error.message;}});
+
+async function initialize(){
+  try{await loadConfig();await loadTasks();const existing=sessionStorage.getItem("movielens-active-chat");if(existing){try{await showChat(existing);}catch{sessionStorage.removeItem("movielens-active-chat");await loadChats();}}else await loadChats();}
+  catch(error){$("context-label").textContent=`服务连接失败：${error.message}`;}
+  if(!configured)void openSettings();
+  statusTimer=setInterval(async()=>{try{await loadTasks();if(selectedTaskId&&$("inspector").classList.contains("is-open")&&(!inspectorState||inspectorState.taskId!==selectedTaskId||["created","queued","running"].includes(inspectorState.state)))await renderInspector(selectedTaskId);}catch{}},6000);
+}
+void initialize();

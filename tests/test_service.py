@@ -20,7 +20,7 @@ from service.rules import build_rules
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REPORT = json.loads((ROOT / "runs/20260923T144724Z-3509cc23/report.json").read_text(encoding="utf-8"))
+REPORT = json.loads((ROOT / "runs/20260930T112146Z-b0d51382/report.json").read_text(encoding="utf-8"))
 
 
 class StubAgent:
@@ -60,11 +60,24 @@ class ServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.project = ROOT
 
-    def test_historical_report_is_readable_but_missing_clean_file_is_explicit(self) -> None:
+    def test_completed_report_and_clean_samples_are_readable(self) -> None:
         service = TaskService(self.project, runner=lambda task_id: 0)
         self.assertEqual(service.status(REPORT["task_id"])["state"], "completed")
         self.assertEqual(service.report(REPORT["task_id"])["clean_data_version"], REPORT["clean_data_version"])
-        self.assertEqual(service.samples(REPORT["task_id"])["state"], "unavailable")
+        samples = service.samples(REPORT["task_id"])
+        self.assertEqual(samples["state"], "available")
+        self.assertEqual(len(samples["rows"]), 5)
+
+    def test_missing_clean_file_is_explicit(self) -> None:
+        project = ROOT / f".test-missing-clean-{uuid.uuid4().hex}"
+        task_id = "test-missing-clean"
+        directory = project / "runs" / task_id
+        directory.mkdir(parents=True)
+        self.addCleanup(lambda: shutil.rmtree(project))
+        report = {**REPORT, "task_id": task_id}
+        (directory / "report.json").write_text(json.dumps(report), encoding="utf-8")
+        service = TaskService(project)
+        self.assertEqual(service.samples(task_id)["state"], "unavailable")
 
     def test_failed_start_exposes_the_actual_last_error(self) -> None:
         output = "Checking input\nTraceback (most recent call last):\nRuntimeError: Raw input checksum or size mismatch: ratings.dat\n"

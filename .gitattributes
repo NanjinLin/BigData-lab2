@@ -1,2 +1,5 @@
 # Preserve the registered MovieLens source bytes across Windows checkouts.
 ml-1m/ml-1m/*.dat -text
+service/static/vendor/markdown-it.min.js -text
+config/quality_rules_v1.json -text
+scripts/*.sh text eol=lf
