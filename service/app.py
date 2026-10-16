@@ -37,18 +37,19 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     "key_storage": "server_memory"}
 
     class Handler(BaseHTTPRequestHandler):
-        def _send(self, code: int, payload: bytes, content_type: str, download: bool = False) -> None:
+        def _send(self, code: int, payload: bytes, content_type: str, download: bool | str = False) -> None:
             self.send_response(code)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             if download:
-                self.send_header("Content-Disposition", 'attachment; filename="report.json"')
+                filename = download if isinstance(download, str) else "report.json"
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
             self.end_headers()
             self.wfile.write(payload)
 
-        def _json(self, code: int, value: dict | list, download: bool = False) -> None:
+        def _json(self, code: int, value: dict | list, download: bool | str = False) -> None:
             self._send(code, json.dumps(value, ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8", download)
 
@@ -83,6 +84,9 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     self._json(200, chat.list())
                     return
                 parts = route.strip("/").split("/")
+                if len(parts) == 4 and parts[:2] == ["api", "conversations"] and parts[3] == "activity":
+                    self._json(200, chat.activity(parts[2]))
+                    return
                 if len(parts) == 3 and parts[:2] == ["api", "conversations"]:
                     self._json(200, chat.get(parts[2]))
                     return
@@ -97,9 +101,15 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     if len(parts) == 4 and parts[3] == "samples":
                         self._json(200, service.samples(task_id))
                         return
+                    if len(parts) == 5 and parts[3] == "analyses":
+                        self._json(200, service.analysis_result(task_id, parts[4]),
+                                   "statistics.json" if "download=1" in urlsplit(self.path).query else False)
+                        return
                 files = {"/": ("index.html", "text/html; charset=utf-8"),
                          "/markdown-it.min.js": ("vendor/markdown-it.min.js", "text/javascript; charset=utf-8"),
                          "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
+                         "/workflow.js": ("workflow.js", "text/javascript; charset=utf-8"),
+                         "/workflow.css": ("workflow.css", "text/css; charset=utf-8"),
                          "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                          "/style.css": ("style.css", "text/css; charset=utf-8")}
                 if route in files:
@@ -124,6 +134,9 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     self._json(201, chat.create())
                     return
                 parts = route.strip("/").split("/")
+                if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "analysis":
+                    self._json(200, service.analyze(parts[2], body))
+                    return
                 if len(parts) == 4 and parts[:2] == ["api", "conversations"] and parts[3] == "messages":
                     self._json(200, chat.send(parts[2], body.get("message"), body.get("task_id")))
                     return

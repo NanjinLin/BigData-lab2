@@ -303,6 +303,27 @@ class TaskService:
                         break
         return {"state": "available", "clean_data_version": report["clean_data_version"], "rows": rows}
 
+    def analyze(self, task_id: str, options: dict) -> dict:
+        from .analysis import AnalysisError, analyze_cleaned
+        report = self.report(task_id)
+        try:
+            return analyze_cleaned(self._directory(task_id), report, options)
+        except AnalysisError as error:
+            raise TaskError(str(error), 422) from error
+        except OSError as error:
+            raise TaskError("无法读取净表或保存统计结果，请检查本机文件。", 500) from error
+
+    def analysis_result(self, task_id: str, analysis_id: str) -> dict:
+        if not re.fullmatch(r"analysis-[0-9a-f]{24}", analysis_id):
+            raise TaskError("无效的统计结果 ID。", 400)
+        path = self._directory(task_id) / "analyses" / f"{analysis_id}.json"
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError as error:
+            raise TaskError("统计结果不存在。", 404) from error
+        except (OSError, ValueError) as error:
+            raise TaskError("统计结果无法读取。", 500) from error
+
     def list_tasks(self) -> list[dict]:
         root = self.project / "runs"
         if not root.is_dir():
@@ -311,7 +332,9 @@ class TaskService:
         for directory in sorted(root.iterdir(), reverse=True):
             if directory.is_dir() and TASK_ID.fullmatch(directory.name):
                 try:
-                    found.append(self.status(directory.name))
+                    status = self.status(directory.name)
+                    found.append({**status, "clean_table_available": status.get("state") == "completed"
+                                  and (directory / "cleaned.tsv").is_file()})
                 except (TaskError, OSError, ValueError):
                     continue
         return found[:20]

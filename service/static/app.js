@@ -48,6 +48,8 @@ function renderMessage(message, {pending=false,error=false} = {}) {
     const content = node("div", "assistant-content");
     if (pending || error) content.textContent = message.content;
     else renderModelAnswer(content, {answer:message.content,model:message.model,model_response_id:message.model_response_id,evidence:message.evidence});
+    if(message.workflow){const plan=node("div","workflow-host");renderWorkflow(plan,message.workflow);content.prepend(plan);}
+    for(const result of message.analyses||[])content.append(renderAnalysis(result));
     if (message.task_id) content.append(taskInline(message.task_id));
     row.append(content);
   }
@@ -163,6 +165,7 @@ async function renderInspector(taskId) {
     if(status.state==="completed"){
       const link=node("a","","下载完整 JSON 报告");link.href=`/api/tasks/${encodeURIComponent(taskId)}/report?download=1`;actions.append(link);
       addAction(actions,"让 Agent 解读报告",()=>{closeInspector();sendMessage("请根据当前任务的正式报告解释五维评分变化、数据处置及仍未解决的问题，并说明结论的局限。")});
+      addAction(actions,"分析电影类型评分",()=>{closeInspector();sendMessage("请复用当前任务净表，比较不同电影类型的平均评分、评分次数和参与人数，说明样本量与统计局限。")});
     }
     body.append(actions);
     if(status.agent){const s=section("本次执行配置");s.append(detailRow("使用工具",status.agent.tool||"未记录"));s.append(detailRow("规则版本",status.agent.rule_version||"未记录"));if(status.agent.options)s.append(detailRow("规则参数",JSON.stringify(status.agent.options)));body.append(s);}
@@ -232,17 +235,23 @@ async function sendMessage(value) {
     const sentTaskId=selectedTaskId;
     const optimistic=renderMessage({role:"user",content:text});
     const pending=renderMessage({role:"assistant",content:"正在思考并检查可用工具…"},{pending:true});scrollBottom();
+    const progressHost=node("div","workflow-host");pending.querySelector(".assistant-content").append(progressHost);
+    let progressBusy=false;
+    const progressTimer=setInterval(async()=>{
+      if(progressBusy||activeChatId!==sentChatId)return;progressBusy=true;
+      try{const activity=await api(`/api/conversations/${encodeURIComponent(sentChatId)}/activity`);if(pending.isConnected&&activity.workflow)renderWorkflow(progressHost,activity.workflow);}catch{}finally{progressBusy=false;}
+    },1000);
     try{
       const result=await api(`/api/conversations/${encodeURIComponent(sentChatId)}/messages`,jsonOptions("POST",{message:text,task_id:sentTaskId}));
       if(activeChatId===sentChatId){
-        pending.remove();renderMessage(result.message);selectedTaskId=result.selected_task_id||null;
+        clearInterval(progressTimer);pending.remove();renderMessage(result.message);selectedTaskId=result.selected_task_id||null;
         $("conversation-title").textContent=result.title;updateContext();
       }
       await loadChats();await loadTasks();
       if(result.message.task_id&&activeChatId===sentChatId)void renderInspector(result.message.task_id);
     }catch(error){
       if(activeChatId===sentChatId){pending.remove();optimistic.remove();renderMessage({role:"assistant",content:`请求未完成：${error.message}`},{error:true});if(!$("message-input").value)$("message-input").value=text;}
-    }
+    }finally{clearInterval(progressTimer);}
   }catch(error){renderMessage({role:"assistant",content:`无法创建对话：${error.message}`},{error:true});$("message-input").value=text;}
   finally{sending=false;$("send-button").disabled=false;scrollBottom();$("message-input").focus();}
 }

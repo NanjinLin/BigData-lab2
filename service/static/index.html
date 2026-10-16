@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#f8fafc">
   <title>MovieLens Agent</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/workflow.css">
 </head>
 <body>
   <div class="app-shell">
@@ -29,7 +30,7 @@
       <header class="topbar"><div class="topbar-leading"><button id="menu-toggle" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button><div><div id="conversation-title" class="topbar-title">新对话</div><div id="context-label" class="topbar-subtitle">与你的数据分析助手交流</div></div></div><div class="topbar-actions"><span id="model-pill" class="model-pill">模型未配置</span><button id="open-settings" class="icon-button" type="button" title="模型设置" aria-label="模型设置">⚙</button><button id="open-inspector" class="icon-button" type="button" title="任务详情" aria-label="任务详情">▤</button></div></header>
 
       <div id="chat-scroll" class="chat-scroll">
-        <div id="welcome" class="welcome"><div class="welcome-mark">M</div><p class="welcome-kicker">MOVIELENS DATA AGENT</p><h1>今天想分析什么？</h1><p>可以自然提问、查看历史任务，或让 Agent 调用已登记的清洗工具。处理结果会留在对话里，详细证据随时展开。</p><div class="suggestions"><button type="button" data-prompt="介绍一下目前能完成哪些数据处理任务？">了解现有能力<span>↗</span></button><button type="button" data-prompt="请使用默认规则清洗完整 MovieLens 1M 数据，并评估五维质量。">运行默认清洗<span>↗</span></button><button type="button" data-prompt="列出已有任务，告诉我哪些任务已经完成。">查看已有任务<span>↗</span></button></div></div>
+        <div id="welcome" class="welcome"><div class="welcome-mark">M</div><p class="welcome-kicker">MOVIELENS DATA AGENT</p><h1>今天想分析什么？</h1><p>可以自然提问、清洗数据，或复用已有结果比较电影评分。Agent 会展示分析计划，结果与依据随时展开。</p><div class="suggestions"><button type="button" data-prompt="介绍一下目前能完成哪些数据处理任务？">了解现有能力<span>↗</span></button><button type="button" data-prompt="请使用默认规则清洗完整 MovieLens 1M 数据，并评估五维质量。">运行默认清洗<span>↗</span></button><button type="button" data-prompt="请复用当前任务或已有已完成任务的可用净表，比较不同电影类型的平均评分、评分次数和参与人数，并说明局限。">比较电影类型<span>↗</span></button></div></div>
         <div id="messages" class="messages" role="log" aria-live="polite" aria-label="对话记录"></div>
       </div>
 
@@ -43,6 +44,7 @@
 
   <script src="/markdown-it.min.js" defer></script>
   <script src="/markdown.js" defer></script>
+  <script src="/workflow.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>
