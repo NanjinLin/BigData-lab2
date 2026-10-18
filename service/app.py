@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from .classification import ClassificationError, ClassificationService
 from .agent import DataGovernanceAgent
 from .chat import ChatService
 from .model import ModelError, ResponsesClient, normalize_base_url
@@ -23,9 +24,10 @@ PUBLIC = Path(__file__).resolve().parent / "static"
 def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 8765,
                   runner=None, agent: DataGovernanceAgent | None = None) -> ThreadingHTTPServer:
     service = TaskService(project, runner=runner, agent=agent)
+    classifiers = ClassificationService(service)
     settings_lock = threading.RLock()
     model_client = getattr(service.agent, "model", None)
-    chat = ChatService(project, service, lambda: model_client)
+    chat = ChatService(project, service, lambda: model_client, classifiers=classifiers)
 
     def model_settings() -> dict:
         with settings_lock:
@@ -101,6 +103,14 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     if len(parts) == 4 and parts[3] == "samples":
                         self._json(200, service.samples(task_id))
                         return
+                    if len(parts) == 5 and parts[3] == "classification":
+                        if parts[4] == "status":
+                            self._json(200, classifiers.status(task_id))
+                            return
+                        if parts[4] == "report":
+                            self._json(200, classifiers.result(task_id),
+                                       "classification-report.json" if "download=1" in urlsplit(self.path).query else False)
+                            return
                     if len(parts) == 5 and parts[3] == "analyses":
                         self._json(200, service.analysis_result(task_id, parts[4]),
                                    "statistics.json" if "download=1" in urlsplit(self.path).query else False)
@@ -115,6 +125,12 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                          "/charts.css": ("charts.css", "text/css; charset=utf-8"),
                          "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                          "/style.css": ("style.css", "text/css; charset=utf-8")}
+                if route == "/classification.js":
+                    self._send(200, (PUBLIC / "classification.js").read_bytes(), "text/javascript; charset=utf-8")
+                    return
+                if route == "/classification.css":
+                    self._send(200, (PUBLIC / "classification.css").read_bytes(), "text/css; charset=utf-8")
+                    return
                 if route in files:
                     name, content_type = files[route]
                     self._send(200, (PUBLIC / name).read_bytes(), content_type)
@@ -122,6 +138,8 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                 raise TaskError("页面或接口不存在。", 404)
             except TaskError as error:
                 self._json(error.code, {"error": str(error)})
+            except ClassificationError as error:
+                self._json(422, {"error": str(error)})
 
         def do_POST(self) -> None:
             route = urlsplit(self.path).path
@@ -137,6 +155,19 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     self._json(201, chat.create())
                     return
                 parts = route.strip("/").split("/")
+                if len(parts) == 5 and parts[:2] == ["api", "tasks"] and parts[3] == "classification":
+                    if parts[4] == "train":
+                        if body:
+                            raise TaskError("训练接口不接受额外参数。", 400)
+                        self._json(202, classifiers.start(parts[2]))
+                        return
+                    if parts[4] == "predict":
+                        if (set(body) != {"user_id", "movie_id", "algorithm"}
+                                or type(body["user_id"]) is not int or type(body["movie_id"]) is not int
+                                or body["algorithm"] not in ("logistic_regression", "decision_tree")):
+                            raise TaskError("预测参数需要 user_id、movie_id 和 algorithm。", 400)
+                        self._json(200, classifiers.predict(parts[2], body["user_id"], body["movie_id"], body["algorithm"]))
+                        return
                 if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "charts":
                     self._json(200, service.chart_data(parts[2], body.get("kind")))
                     return
@@ -155,6 +186,8 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                 raise TaskError("接口不存在。", 404)
             except TaskError as error:
                 self._json(error.code, {"error": str(error)})
+            except ClassificationError as error:
+                self._json(422, {"error": str(error)})
 
         def do_PUT(self) -> None:
             nonlocal model_client

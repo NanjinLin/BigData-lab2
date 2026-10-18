@@ -1,0 +1,73 @@
+.classification-dialog{width:min(930px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;border:1px solid var(--border, #e2e8f0);border-radius:16px;background:var(--surface,#fff);color:inherit;padding:22px 24px;box-shadow:0 24px 80px #0b254135}
+.classification-dialog::backdrop{background:#08152788}
+.classification-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.classification-header h2{font-size:1.45rem;margin:4px 0 6px}
+.classification-header p{margin:0;color:var(--text-muted,#64748b);font-size:.89rem}
+.classification-header .eyebrow{font-size:.68rem;letter-spacing:.14em}
+.classification-form,.classification-actions,.classification-predict-form{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:18px 0}
+.classification-form label,.classification-predict-form label{display:block;font-size:.82rem;margin-bottom:6px;font-weight:600}
+.classification-form select,.classification-predict-form input{min-height:38px;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid #b7c5d5;background:#fff;color:#182538}
+.classification-form select{flex:1;min-width:220px}
+.classification-predict-form>div{flex:1;min-width:125px}
+.classification-predict-form input{width:100%}
+.classification-dialog button{cursor:pointer}
+.classification-dialog button:disabled{opacity:.5;cursor:wait}
+.classification-status{white-space:pre-wrap;border-radius:9px;background:#eff4f8;color:#254360;padding:10px 12px;font-size:.85rem;line-height:1.55}
+.classification-status.error{background:#fff1f2;color:#9f1d2d}
+.classification-actions{align-items:center;justify-content:space-between}
+.classification-report{margin:16px 0}
+.classification-report h3{margin:16px 0 10px;font-size:1rem}
+.classification-table-wrap{max-width:100%;overflow-x:auto}
+.classification-table{border-collapse:collapse;width:100%;font-size:.81rem;min-width:570px}
+.classification-table th,.classification-table td{text-align:right;padding:10px 8px;border-bottom:1px solid #e0e7ef;white-space:nowrap}
+.classification-table th:first-child,.classification-table td:first-child{text-align:left}
+.classification-table th{background:#eff4f8;color:#334155;font-weight:650}
+.classification-meta{font-size:.82rem;color:#52667c;line-height:1.7;overflow-wrap:anywhere}
+.classification-predictions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.classification-card{border:1px solid #dbe5ee;border-radius:10px;background:#fff;padding:14px;min-width:0}
+.classification-card h4{font-size:.96rem;margin:0 0 12px}
+.classification-card .classification-prob{font-size:1.6rem;font-weight:750;color:#155e9d}
+.classification-card p{margin:7px 0;line-height:1.5;color:#41566a;font-size:.83rem}
+.classification-card .classification-version{font-size:.7rem;word-break:break-all}
+.classification-dialog .secondary-button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+@media(max-width:620px){.classification-dialog{padding:14px}.classification-form select{flex:1 1 100%}.classification-header h2{font-size:1.2rem}}
+
+.classification-dialog [hidden]{display:none!important}
+/* Classification v2: compact hierarchy, technical details on demand. */
+.classification-dialog{width:min(900px,calc(100vw - 24px));padding:24px 28px}
+.classification-header{padding-bottom:12px;border-bottom:1px solid #e7ecf2}
+.classification-header h2{margin:2px 0 4px;font-size:1.4rem;letter-spacing:-.025em}
+.classification-header .eyebrow{color:#6b8094;font-size:.67rem}
+.classification-toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:18px 0 8px}
+.classification-toolbar .classification-form{margin:0;flex:1 1 320px;min-width:230px;align-items:end}
+.classification-form select{width:100%;min-width:160px;min-height:42px}
+.classification-toolbar .primary-button,.classification-toolbar .secondary-button{min-height:42px}
+.classification-status{background:transparent;color:#617286;padding:5px 0 7px;margin:0;font-size:.83rem}
+.classification-status.error{background:#fff1f2;padding:9px 12px}
+.classification-report{margin:12px 0 22px}
+.classification-section-heading{display:flex;gap:12px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.classification-section-heading h3{font-size:1.05rem;margin:8px 0 10px}
+.classification-overview{color:#6a7b8d;font-size:.78rem;margin:0 0 8px}
+.classification-table{min-width:570px;font-size:.83rem}
+.classification-table th{background:#f6f8fb;color:#4d6076}
+.classification-table th,.classification-table td{padding:11px 10px}
+.classification-table td:first-child{font-weight:600}
+.classification-details{border-bottom:1px solid #e7ecf2;margin-top:10px;padding:7px 0}
+.classification-details summary{cursor:pointer;color:#567086;font-size:.83rem;list-style-position:inside;padding:8px 0}
+.classification-details .classification-meta{font-size:.8rem;margin:9px 0;color:#596b7f}
+.classification-predict-form{border-top:1px solid #e7ecf2;padding-top:20px;margin:12px 0 14px}
+.classification-predict-form input{min-height:42px}
+.classification-predict-form .primary-button{min-height:42px}
+.classification-predictions{display:block}
+.classification-target{font-size:.86rem;color:#42566b;font-weight:600;margin:5px 0 14px}
+.classification-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.classification-card{background:#fff;border:1px solid #e0e8ef;border-radius:12px;padding:18px}
+.classification-card-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.classification-card h4{font-size:1rem;margin:0}
+.classification-class{font-size:.77rem;border-radius:5px;padding:4px 8px;background:#eef4fb;color:#285887}
+.classification-class.negative{background:#f4f5f7;color:#495766}
+.classification-card .classification-prob{font-size:2rem;font-weight:750;letter-spacing:-.04em;margin-top:14px}
+.classification-card .classification-prob-label{margin:0 0 13px;color:#6b7c8f;font-size:.77rem}
+.classification-card .classification-history,.classification-card .classification-low-history{margin:0;color:#637487;font-size:.79rem}
+@media(max-width:620px){.classification-dialog{padding:18px 16px}.classification-result-grid{grid-template-columns:1fr}.classification-toolbar .classification-form{flex:1 1 100%}}
+.classification-dialog [hidden]{display:none!important}

@@ -15,10 +15,10 @@ from urllib.request import Request, urlopen
 
 from service.agent import DataGovernanceAgent
 from service.app import create_server
-from service.chat import ChatService
+from service.chat import ChatService, _short_classification_answer
 from service.model import ResponsesClient
 from service.model import ModelError
-from service.tasks import TaskService
+from service.tasks import TaskError, TaskService
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -192,6 +192,173 @@ class ChatTests(unittest.TestCase):
                 self.assertIn("保留", message["content"])
                 self.assertEqual(message["analyses"][0]["rows"][0]["mean_rating"], 4)
                 self.assertEqual(chat.get(ident)["messages"][-1]["analyses"], message["analyses"])
+
+    def test_short_classification_answer_includes_all_required_fields(self):
+        data = [
+            {"algorithm": "logistic_regression", "status": "completed", "user_id": 7,
+             "movie_id": 5, "movie_title": "Test Movie", "experiment_id": "cls-abc",
+             "positive_probability": .6247, "predicted_class": 1,
+             "test": {"f1": .66, "roc_auc": .75},
+             "model_version": "cls-abc-logistic_regression",
+             "parameters": {"C": 0.1, "max_iter": 250}, "user_train_rating_count": 9},
+            {"algorithm": "decision_tree", "status": "completed", "user_id": 7,
+             "movie_id": 5, "movie_title": "Test Movie", "experiment_id": "cls-abc",
+             "positive_probability": .72, "predicted_class": 1,
+             "test": {"f1": .71, "roc_auc": .74},
+             "model_version": "cls-abc-decision_tree",
+             "parameters": {"max_depth": 10, "min_samples_leaf": 30},
+             "user_train_rating_count": 9}]
+        for prompt in ("请分析userID7在movieID5里评分超过4分的概率",
+                       "预测用户7对电影5，并比较概率与模型版本",
+                       "详细解释模型特征和原因"):
+            with self.subTest(prompt=prompt):
+                result = _short_classification_answer(prompt, data)
+                self.assertIn("62.5%", result)
+                self.assertIn("72.0%", result)
+                self.assertIn("≥4 分", result)
+                self.assertIn("0.710", result)
+                self.assertIn("0.750", result)
+                self.assertIn("cls-abc-logistic_regression", result)
+                self.assertIn("cls-abc-decision_tree", result)
+                self.assertIn("C=0.1", result)
+                self.assertIn("max_depth=10", result)
+                self.assertNotIn("局限", result)
+        single = _short_classification_answer("只用逻辑回归预测用户7", data[:1])
+        self.assertIn("62.5%", single)
+        self.assertIn("C=0.1", single)
+        self.assertNotIn("决策树", single)
+        self.assertIsNone(_short_classification_answer("预测", [{**data[0], "status": "failed"}]))
+
+    def test_classification_answer_explains_metrics_and_prediction(self):
+        items = [
+            {"algorithm": "logistic_regression", "status": "completed",
+             "user_id": 2216, "movie_id": 1193,
+             "movie_title": "One Flew Over the Cuckoo's Nest (1975)",
+             "experiment_id": "cls-valid", "positive_probability": .679,
+             "predicted_class": 1, "model_version": "cls-valid-logistic_regression",
+             "parameters": {"C": .1}, "test": {"f1": .736, "roc_auc": .750},
+             "user_train_rating_count": 52},
+            {"algorithm": "decision_tree", "status": "completed",
+             "user_id": 2216, "movie_id": 1193,
+             "movie_title": "One Flew Over the Cuckoo's Nest (1975)",
+             "experiment_id": "cls-valid", "positive_probability": .75,
+             "predicted_class": 1, "model_version": "cls-valid-decision_tree",
+             "parameters": {"max_depth": 10}, "test": {"f1": .728, "roc_auc": .746},
+             "user_train_rating_count": 52},
+        ]
+        result = _short_classification_answer("请分析用户2216的评分超过4分的概率", items)
+        self.assertIn("**结果分析**", result)
+        self.assertIn("7.1 个百分点", result)
+        self.assertIn("F1 综合衡量精确率和召回率", result)
+        self.assertIn("AUC 衡量区分高分与非高分样本", result)
+        self.assertIn("训练期 52 条历史评分", result)
+        self.assertIn("≥4 分（包含 4 分）", result)
+        self.assertIn("cls-valid-decision_tree", result)
+        self.assertIn("C=0.1", result)
+        self.assertNotIn("因果关系", result)
+
+        opposite = _short_classification_answer("预测", [items[0], {**items[1],
+            "predicted_class": 0, "positive_probability": .25,
+            "user_train_rating_count": 0}])
+        self.assertIn("两种模型的判断不同", opposite)
+        self.assertNotIn("训练期 52 条历史评分", opposite)
+        solo = _short_classification_answer("只用逻辑回归", [items[0]])
+        self.assertIn("**结果分析**", solo)
+        self.assertNotIn("决策树", solo)
+
+    def test_prediction_errors_are_reported_without_fake_probabilities(self):
+        from service.classification import ClassificationError
+
+        class BrokenClassifiers:
+            def __init__(self, reason):
+                self.reason = reason
+            def predict(self, task_id, uid, mid, algorithm):
+                raise ClassificationError(self.reason)
+
+        task_id = self.small_task()
+        for reason in ("未知 UserID：999999。", "未知 MovieID：999999。",
+                       "尚无已完成分类训练报告，请先训练两种分类算法。"):
+            with self.subTest(reason=reason):
+                model = FakeModel(plan_reply("predict_high_rating_logistic_regression"),
+                                  tool_reply("predict_high_rating_logistic_regression",
+                                             {"task_id": task_id, "user_id": 999999, "movie_id": 1193}),
+                                  assessment_reply(False), text_reply("概率为80%。"))
+                chat = ChatService(self.project, self.tasks, lambda: model,
+                                   classifiers=BrokenClassifiers(reason))
+                message = chat.send(chat.create()["id"], "请预测这个用户的评分", task_id)["message"]
+                self.assertEqual(message["content"], "无法完成分类预测：" + reason)
+                self.assertEqual(message["classifications"], [])
+                self.assertFalse(message["workflow"]["validation"]["answerable"])
+
+    def test_two_classification_tools_in_one_model_response(self):
+        """A provider may ignore parallel_tool_calls=False; preserve both predictions."""
+        task_id = self.small_task()
+
+        class FakeClassification:
+            def __init__(self):
+                self.calls = []
+
+            def predict(self, tid, uid, mid, algorithm):
+                self.calls.append((tid, uid, mid, algorithm))
+                return {"status": "completed", "algorithm": algorithm, "task_id": tid,
+                        "user_id": uid, "movie_id": mid, "experiment_id": "cls-stub",
+                        "positive_probability": 0.8 if algorithm == "decision_tree" else 0.2,
+                        "predicted_class": int(algorithm == "decision_tree"),
+                        "model_version": f"cls-stub-{algorithm}",
+                        "parameters": {"C": 1.0} if algorithm == "logistic_regression" else {"max_depth": 10},
+                        "test": {"f1": 0.73 if algorithm == "logistic_regression" else 0.72,
+                                 "roc_auc": 0.75},
+                        "history_warning": "该用户在训练期无历史评分。",
+                        "evidence": f"runs/{tid}/classification/report.json"}
+
+        def paired_calls():
+            return {"id": "batch", "output": [
+                {"type": "function_call", "name": f"predict_high_rating_{algorithm}",
+                 "call_id": f"call-{algorithm}",
+                 "arguments": json.dumps({"task_id": task_id, "user_id": 1, "movie_id": 1})}
+                for algorithm in ("logistic_regression", "decision_tree")]}
+
+        for batch_plan in (False, True):
+            with self.subTest(batch_plan=batch_plan):
+                plan = plan_reply("predict_high_rating_logistic_regression", "predict_high_rating_decision_tree")
+                responses = [plan, paired_calls()] if not batch_plan else [
+                    {"id": "batch-plan", "output": plan["output"] + paired_calls()["output"]}]
+                model = FakeModel(*responses, assessment_reply(), text_reply("两种模型预测结果已比较。"))
+                classifiers = FakeClassification()
+                chat = ChatService(self.project, self.tasks, lambda: model, classifiers=classifiers)
+                answer = chat.send(chat.create()["id"], "比较用户1对电影1的两种预测", task_id)["message"]
+                self.assertIn("逻辑回归", answer["content"])
+                self.assertIn("决策树", answer["content"])
+                self.assertIn("cls-stub-logistic_regression", answer["content"])
+                self.assertIn("cls-stub-decision_tree", answer["content"])
+                self.assertIn("C=1.0", answer["content"])
+                self.assertIn("max_depth=10", answer["content"])
+                self.assertEqual([r["algorithm"] for r in answer["classifications"]], ["logistic_regression", "decision_tree"])
+                self.assertEqual([call[-1] for call in classifiers.calls], ["logistic_regression", "decision_tree"])
+                self.assertEqual(answer["workflow"]["validation"]["status"], "limited")
+                inputs = model.calls[-2]["input"]
+                outputs = [entry for entry in inputs if entry.get("type") == "function_call_output"]
+                self.assertEqual([entry["call_id"] for entry in outputs][-2:], ["call-logistic_regression", "call-decision_tree"])
+                self.assertEqual(len(answer["evidence"]), 1)
+
+    def test_multi_tool_call_refuses_side_effects_before_any_execution(self):
+        """Batch execution must never dispatch Hadoop or classification training."""
+        model = FakeModel({"id": "unsafe", "output": [
+            {"type": "function_call", "name": "run_hadoop_clean_and_score",
+             "call_id": "call-run", "arguments": json.dumps({"rule_version": "quality-clean-v1.0.0"})},
+            {"type": "function_call", "name": "list_saved_tasks", "call_id": "call-list", "arguments": "{}"}]})
+        chat = ChatService(self.project, self.tasks, lambda: model)
+        with self.assertRaisesRegex(TaskError, "不可批量执行"):
+            chat.send(chat.create()["id"], "同时执行清洗并查询任务")
+        self.assertIsNone(self.tasks.active)
+
+    def test_duplicate_call_ids_in_batch_are_refused(self):
+        model = FakeModel({"id": "duplicates", "output": [
+            {"type": "function_call", "name": "list_saved_tasks", "call_id": "same", "arguments": "{}"},
+            {"type": "function_call", "name": "list_saved_tasks", "call_id": "same", "arguments": "{}"}]})
+        chat = ChatService(self.project, self.tasks, lambda: model)
+        with self.assertRaisesRegex(TaskError, "标识缺失或重复"):
+            chat.send(chat.create()["id"], "查看任务")
 
     def test_statistics_http_api_and_download(self):
         task_id = self.small_task()

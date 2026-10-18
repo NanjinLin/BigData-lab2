@@ -65,8 +65,15 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(service.status(REPORT["task_id"])["state"], "completed")
         self.assertEqual(service.report(REPORT["task_id"])["clean_data_version"], REPORT["clean_data_version"])
         samples = service.samples(REPORT["task_id"])
-        self.assertEqual(samples["state"], "available")
-        self.assertEqual(len(samples["rows"]), 5)
+        # The large Hadoop output is intentionally Git-ignored; both situations
+        # are valid depending on whether this checkout is the processing host.
+        if (self.project / "runs" / REPORT["task_id"] / "cleaned.tsv").is_file():
+            self.assertEqual(samples["state"], "available")
+            self.assertEqual(len(samples["rows"]), 5)
+        else:
+            self.assertEqual(samples["state"], "unavailable")
+            self.assertFalse(samples["rows"])
+            self.assertIn("净表", samples["reason"])
 
     def test_missing_clean_file_is_explicit(self) -> None:
         project = ROOT / f".test-missing-clean-{uuid.uuid4().hex}"

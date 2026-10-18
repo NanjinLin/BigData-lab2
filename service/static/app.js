@@ -50,6 +50,8 @@ function renderMessage(message, {pending=false,error=false} = {}) {
     else renderModelAnswer(content, {answer:message.content,model:message.model,model_response_id:message.model_response_id,evidence:message.evidence});
     if(message.workflow){const plan=node("div","workflow-host");renderWorkflow(plan,message.workflow);content.prepend(plan);}
     for(const result of message.analyses||[])content.append(renderAnalysis(result));
+    // Classification results already appear in the Agent answer. Avoid repeating
+    // the same predictions as another stack of cards below the response.
     if (message.task_id) content.append(taskInline(message.task_id));
     row.append(content);
   }
@@ -163,6 +165,7 @@ async function renderInspector(taskId) {
     const actions=node("div","detail-section detail-actions");
     addAction(actions,"在对话中询问此任务",()=>{closeInspector();$("message-input").focus();});
     if(status.state==="completed"){
+      addAction(actions,"评分分类分析",()=>{closeInspector();openClassification(taskId);});
       addAction(actions,"查看数据图表",()=>{closeInspector();openTaskCharts("quality-bars",taskId);});
       const link=node("a","","下载完整 JSON 报告");link.href=`/api/tasks/${encodeURIComponent(taskId)}/report?download=1`;actions.append(link);
       addAction(actions,"让 Agent 解读报告",()=>{closeInspector();sendMessage("请根据当前任务的正式报告解释五维评分变化、数据处置及仍未解决的问题，并说明结论的局限。")});

@@ -1,0 +1,4 @@
+# Python environment for MovieLens iteration-two rating classification
+numpy>=1.24,<3
+scikit-learn>=1.3,<2
+joblib>=1.3,<2

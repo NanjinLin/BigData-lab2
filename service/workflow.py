@@ -6,7 +6,9 @@ from .tasks import TaskError
 
 
 OPERATIONS = ("list_saved_tasks", "get_task_status", "read_task_report", "analyze_movielens",
-              "run_hadoop_clean_and_score", "run_hadoop_with_adjusted_rules")
+              "run_hadoop_clean_and_score", "run_hadoop_with_adjusted_rules",
+              "train_rating_classifiers", "get_classification_status", "read_classification_report",
+              "predict_high_rating_logistic_regression", "predict_high_rating_decision_tree")
 PLAN_TOOL = {
     "type": "function", "name": "set_analysis_plan", "strict": True,
     "description": "在读取报告、统计或清洗前先登记简短计划。目标来自当前用户请求，只列必要工具；已有净表可直接复用。普通聊天无需计划。",

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/workflow.css">
   <link rel="stylesheet" href="/charts.css">
+  <link rel="stylesheet" href="/classification.css">
 </head>
 <body>
   <div class="app-shell">
@@ -26,6 +27,8 @@
           <button type="button" class="nav-item" data-chart="distribution"><span class="item-icon" aria-hidden="true">◔</span><span class="item-label">1—5 分评分分布</span></button>
           <button type="button" class="nav-item" data-chart="scatter"><span class="item-icon" aria-hidden="true">⠿</span><span class="item-label">评分次数与平均分</span></button>
         </div>
+        <div class="nav-title"><span>机器学习分析</span></div>
+        <div class="nav-list"><button id="classification-open" class="nav-item" type="button"><span class="item-icon" aria-hidden="true">◈</span><span class="item-label">评分分类 · 两算法对照</span></button></div>
         <div class="nav-title"><span>对话</span><button id="refresh-chats" class="icon-button subtle" type="button" title="刷新对话">↻</button></div>
         <div id="chat-list" class="nav-list" aria-label="历史对话"></div>
         <div class="nav-title task-title"><span>处理任务</span><button id="refresh-tasks" class="icon-button subtle" type="button" title="刷新任务">↻</button></div>
@@ -75,11 +78,30 @@
     </div>
   </dialog>
 
+  <dialog id="classification-dialog" class="classification-dialog" aria-labelledby="classification-title">
+    <div class="classification-header"><div><p class="eyebrow">MOVIELENS · CLASSIFICATION</p><h2 id="classification-title">评分分类</h2><p>预测用户是否会给电影打至少 4 分</p></div><button id="classification-close" class="icon-button" type="button" aria-label="关闭分类面板">×</button></div>
+    <div class="classification-toolbar">
+      <form id="classification-task-form" class="classification-form">
+        <label for="classification-task">数据任务</label><select id="classification-task" required><option value="">选择任务</option></select>
+      </form>
+      <button id="classification-train" class="primary-button" type="button" disabled>开始训练</button>
+      <a id="classification-download" class="secondary-button" href="#" hidden>下载实验报告</a>
+    </div>
+    <p id="classification-status" class="classification-status" role="status" aria-live="polite"></p>
+    <div id="classification-report" class="classification-report"></div>
+    <form id="classification-predict-form" class="classification-predict-form" hidden>
+      <div><label for="classification-user">UserID</label><input id="classification-user" type="number" min="1" step="1" placeholder="例如 2216" required></div>
+      <div><label for="classification-movie">MovieID</label><input id="classification-movie" type="number" min="1" step="1" placeholder="例如 1193" required></div>
+      <button class="primary-button" type="submit">预测</button>
+    </form>
+    <div id="classification-predictions" class="classification-predictions"></div>
+  </dialog>
   <script src="/markdown-it.min.js" defer></script>
   <script src="/markdown.js" defer></script>
   <script src="/workflow.js" defer></script>
   <script src="/chart-renderers.js" defer></script>
   <script src="/charts.js" defer></script>
   <script src="/app.js" defer></script>
+  <script src="/classification.js" defer></script>
 </body>
 </html>

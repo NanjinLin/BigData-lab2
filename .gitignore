@@ -8,3 +8,6 @@ __pycache__/
 !/runs/*/report.json
 !/runs/*/score_before.tsv
 !/runs/*/score_after.tsv
+
+# Local Python ML environment and downloaded packages.
+.venv/
