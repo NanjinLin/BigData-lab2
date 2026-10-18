@@ -7,6 +7,7 @@
   <title>MovieLens Agent</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/workflow.css">
+  <link rel="stylesheet" href="/charts.css">
 </head>
 <body>
   <div class="app-shell">
@@ -17,6 +18,14 @@
         <button id="new-chat" class="new-chat" type="button"><span aria-hidden="true">＋</span> 新对话</button>
       </div>
       <nav class="sidebar-scroll">
+        <div class="nav-title"><span>数据图表</span><span class="chart-nav-count">5</span></div>
+        <div class="nav-list chart-nav" aria-label="数据图表">
+          <button type="button" class="nav-item" data-chart="quality-bars"><span class="item-icon" aria-hidden="true">▥</span><span class="item-label">质量对比 · 柱状图</span></button>
+          <button type="button" class="nav-item" data-chart="quality-radar"><span class="item-icon" aria-hidden="true">◇</span><span class="item-label">质量概览 · 雷达图</span></button>
+          <button type="button" class="nav-item" data-chart="genre"><span class="item-icon" aria-hidden="true">▤</span><span class="item-label">电影类型评分</span></button>
+          <button type="button" class="nav-item" data-chart="distribution"><span class="item-icon" aria-hidden="true">◔</span><span class="item-label">1—5 分评分分布</span></button>
+          <button type="button" class="nav-item" data-chart="scatter"><span class="item-icon" aria-hidden="true">⠿</span><span class="item-label">评分次数与平均分</span></button>
+        </div>
         <div class="nav-title"><span>对话</span><button id="refresh-chats" class="icon-button subtle" type="button" title="刷新对话">↻</button></div>
         <div id="chat-list" class="nav-list" aria-label="历史对话"></div>
         <div class="nav-title task-title"><span>处理任务</span><button id="refresh-tasks" class="icon-button subtle" type="button" title="刷新任务">↻</button></div>
@@ -42,9 +51,35 @@
 
   <dialog id="settings-dialog" class="settings-dialog"><form id="settings-form" method="dialog"><div class="dialog-header"><div><p class="eyebrow">MODEL CONNECTION</p><h2>模型设置</h2></div><button id="close-settings" type="button" class="icon-button" aria-label="关闭设置">×</button></div><p class="settings-intro">连接支持 Responses API 的模型服务。页面填写的配置只保存在本次服务进程内存中；API Key 不会回传到页面、写入会话文件或浏览器存储。重启后可重新填写，也可继续使用已有环境变量。</p><div class="field"><label for="setting-model">模型名称</label><input id="setting-model" name="model" autocomplete="off" placeholder="例如 gpt-5.4-mini" required></div><div class="field"><label for="setting-url">API 基础 URL</label><input id="setting-url" name="base_url" type="url" autocomplete="off" placeholder="https://api.openai.com/v1" required><small>填写基础 URL，不含 /responses；仅本机地址可使用 HTTP。</small></div><div class="field"><label for="setting-key">API Key</label><div class="secret-row"><input id="setting-key" name="api_key" type="password" autocomplete="new-password" placeholder="输入 Key（留空则保留当前 Key）"><button id="toggle-key" type="button" class="text-button">显示</button></div><small id="key-state">尚未设置 Key</small></div><p id="settings-error" class="form-error" role="alert"></p><div class="dialog-actions"><button id="clear-key" type="button" class="danger-button">移除 Key</button><div><button id="cancel-settings" type="button" class="secondary-button">取消</button><button id="save-settings" type="submit" class="primary-button">保存连接</button></div></div></form></dialog>
 
+  <dialog id="charts-dialog" class="charts-dialog" aria-labelledby="charts-title">
+    <div class="charts-sticky">
+    <div class="charts-header"><div><p class="eyebrow">DATA EXPLORER</p><h2 id="charts-title">数据图表</h2><p id="charts-subtitle">选择已完成任务，查看真实数据。</p></div><button id="close-charts" class="icon-button" type="button" aria-label="关闭图表">×</button></div>
+    <div id="chart-tabs" class="chart-tabs" role="group" aria-label="切换图表"></div>
+    </div>
+    <form id="chart-form" class="chart-task-form">
+      <div class="chart-task-field"><label for="chart-task">选择任务</label><select id="chart-task"><option value="">选择已完成任务…</option></select></div>
+      <button id="view-chart" class="primary-button" type="submit">查看图表</button>
+      <details class="chart-other-task"><summary>按 ID 查找</summary><label class="sr-only" for="chart-task-id">其他任务 ID</label><input id="chart-task-id" placeholder="输入其他任务 ID" autocomplete="off"></details>
+    </form>
+    <div class="charts-content">
+      <p id="chart-status" class="chart-status" role="status" aria-live="polite">先选择任务，再点击“查看图表”。</p>
+      <div id="chart-result" hidden>
+        <div class="chart-result-top"><div id="chart-summary" class="chart-summary"></div><div class="chart-downloads"><button id="download-chart" type="button" class="secondary-button">下载 SVG</button><button id="download-chart-data" type="button" class="secondary-button">下载数据</button></div></div>
+        <div id="chart-options" class="chart-options"></div>
+        <p class="chart-scroll-hint">窄屏下可左右滑动图表，查看完整坐标与数值。</p>
+        <div id="chart-plot" class="chart-plot"></div>
+        <div id="chart-notes" class="chart-notes"></div>
+        <details id="chart-table-details" class="chart-table-details"><summary>查看图表数据</summary><div id="chart-table" class="detail-table-wrap"></div></details>
+        <p id="chart-source" class="chart-source"></p>
+      </div>
+    </div>
+  </dialog>
+
   <script src="/markdown-it.min.js" defer></script>
   <script src="/markdown.js" defer></script>
   <script src="/workflow.js" defer></script>
+  <script src="/chart-renderers.js" defer></script>
+  <script src="/charts.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

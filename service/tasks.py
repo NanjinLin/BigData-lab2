@@ -324,6 +324,20 @@ class TaskService:
         except (OSError, ValueError) as error:
             raise TaskError("统计结果无法读取。", 500) from error
 
+    def chart_data(self, task_id: str, kind: str) -> dict:
+        from .analysis import AnalysisError, analyze_cleaned
+        if kind not in ("genre", "distribution", "scatter"):
+            raise TaskError("不支持的图表类型。", 400)
+        report = self.report(task_id)
+        try:
+            return analyze_cleaned(self._directory(task_id), report,
+                                   {"group_by": "genre" if kind == "genre" else "movie"},
+                                   all_groups=kind != "genre")
+        except AnalysisError as error:
+            raise TaskError(str(error), 422) from error
+        except OSError as error:
+            raise TaskError("无法读取净表或保存图表统计，请检查本机文件。", 500) from error
+
     def list_tasks(self) -> list[dict]:
         root = self.project / "runs"
         if not root.is_dir():

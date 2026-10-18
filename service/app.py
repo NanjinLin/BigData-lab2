@@ -110,6 +110,9 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                          "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
                          "/workflow.js": ("workflow.js", "text/javascript; charset=utf-8"),
                          "/workflow.css": ("workflow.css", "text/css; charset=utf-8"),
+                         "/charts.js": ("charts.js", "text/javascript; charset=utf-8"),
+                         "/chart-renderers.js": ("chart-renderers.js", "text/javascript; charset=utf-8"),
+                         "/charts.css": ("charts.css", "text/css; charset=utf-8"),
                          "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                          "/style.css": ("style.css", "text/css; charset=utf-8")}
                 if route in files:
@@ -134,6 +137,9 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     self._json(201, chat.create())
                     return
                 parts = route.strip("/").split("/")
+                if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "charts":
+                    self._json(200, service.chart_data(parts[2], body.get("kind")))
+                    return
                 if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "analysis":
                     self._json(200, service.analyze(parts[2], body))
                     return

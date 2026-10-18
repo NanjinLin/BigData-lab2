@@ -163,6 +163,7 @@ async function renderInspector(taskId) {
     const actions=node("div","detail-section detail-actions");
     addAction(actions,"在对话中询问此任务",()=>{closeInspector();$("message-input").focus();});
     if(status.state==="completed"){
+      addAction(actions,"查看数据图表",()=>{closeInspector();openTaskCharts("quality-bars",taskId);});
       const link=node("a","","下载完整 JSON 报告");link.href=`/api/tasks/${encodeURIComponent(taskId)}/report?download=1`;actions.append(link);
       addAction(actions,"让 Agent 解读报告",()=>{closeInspector();sendMessage("请根据当前任务的正式报告解释五维评分变化、数据处置及仍未解决的问题，并说明结论的局限。")});
       addAction(actions,"分析电影类型评分",()=>{closeInspector();sendMessage("请复用当前任务净表，比较不同电影类型的平均评分、评分次数和参与人数，说明样本量与统计局限。")});
@@ -258,6 +259,7 @@ async function sendMessage(value) {
 function resizeComposer(){const input=$("message-input");input.style.height="auto";input.style.height=`${Math.min(input.scrollHeight,160)}px`;}
 
 $("new-chat").addEventListener("click",()=>void newChat());
+for(const button of document.querySelectorAll("[data-chart]"))button.addEventListener("click",()=>{closeMobileMenu();openTaskCharts(button.dataset.chart,selectedTaskId);});
 $("refresh-chats").addEventListener("click",()=>void loadChats());
 $("refresh-tasks").addEventListener("click",()=>void loadTasks());
 $("menu-toggle").addEventListener("click",()=>{$("sidebar").classList.add("is-open");$("mobile-backdrop").hidden=false;});
@@ -279,7 +281,6 @@ $("clear-key").addEventListener("click",async()=>{try{await api("/api/model-conf
 async function initialize(){
   try{await loadConfig();await loadTasks();const existing=sessionStorage.getItem("movielens-active-chat");if(existing){try{await showChat(existing);}catch{sessionStorage.removeItem("movielens-active-chat");await loadChats();}}else await loadChats();}
   catch(error){$("context-label").textContent=`服务连接失败：${error.message}`;}
-  if(!configured)void openSettings();
   statusTimer=setInterval(async()=>{try{await loadTasks();if(selectedTaskId&&$("inspector").classList.contains("is-open")&&(!inspectorState||inspectorState.taskId!==selectedTaskId||["created","queued","running"].includes(inspectorState.state)))await renderInspector(selectedTaskId);}catch{}},6000);
 }
 void initialize();

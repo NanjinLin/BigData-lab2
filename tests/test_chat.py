@@ -205,6 +205,14 @@ class ChatTests(unittest.TestCase):
                               headers={"Content-Type": "application/json"}, method="POST")
             with urlopen(request) as response:
                 result = json.load(response)
+            charts = Request(base + f"/api/tasks/{task_id}/charts", data=b'{"kind":"scatter"}',
+                             headers={"Content-Type": "application/json"}, method="POST")
+            with urlopen(charts) as response:
+                chart_data = json.load(response)
+            self.assertEqual(chart_data["rating_distribution"], {"1": 0, "2": 0, "3": 1, "4": 0, "5": 1})
+            for asset in ("charts.js", "chart-renderers.js", "charts.css"):
+                with urlopen(base + "/" + asset) as response:
+                    self.assertEqual(response.status, 200)
             with urlopen(base + f"/api/tasks/{task_id}/analyses/{result['analysis_id']}?download=1") as response:
                 self.assertIn("statistics.json", response.headers["Content-Disposition"])
                 self.assertEqual(json.load(response)["rows"], result["rows"])

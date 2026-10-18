@@ -116,6 +116,36 @@ class AnalysisTests(unittest.TestCase):
         self.assertNotEqual(first["source"]["report_content_sha256"], updated["source"]["report_content_sha256"])
         self.assertEqual(updated["source"]["rating_disposition"]["quarantine"], 5)
 
+    def test_chart_distribution_counts_each_rating_once_including_untyped_movies(self):
+        result = self.tasks.chart_data("fixture", "distribution")
+        self.assertEqual(result["rating_distribution"], {str(i): 1 for i in range(1, 6)})
+        self.assertEqual(sum(result["rating_distribution"].values()), result["coverage"]["matched_ratings"])
+        genres = self.tasks.chart_data("fixture", "genre")
+        self.assertEqual(sum(genres["rating_distribution"].values()), 4)
+        self.assertEqual(sum(row["rating_count"] for row in genres["rows"]), 6)
+
+    def test_scatter_includes_all_movies_without_changing_agent_ranking_limit(self):
+        self.records = [("ratings", ["1", str(i), str(i % 5 + 1), str(i)]) for i in range(1, 71)]
+        self.records += [("movies", [str(i), f"Movie {i} (2000)", "Drama"]) for i in range(1, 71)]
+        self.records += [("users", ["1", "M", "25", "0", "10000"])]
+        self.write_fixture()
+        self.assertEqual(len(self.tasks.analyze("fixture", {"group_by": "movie", "limit": 50})["rows"]), 50)
+        chart = self.tasks.chart_data("fixture", "scatter")
+        self.assertEqual(len(chart["rows"]), 70)
+        self.assertEqual(chart["groups"]["returned"], 70)
+        self.assertIsNone(chart["query"]["limit"])
+        self.assertEqual(sum(chart["rating_distribution"].values()), 70)
+        with self.assertRaises(TaskError):
+            self.tasks.analyze("fixture", {"limit": None})
+
+    def test_chart_errors_are_explicit_and_do_not_create_hadoop_tasks(self):
+        with self.assertRaisesRegex(TaskError, "图表类型"):
+            self.tasks.chart_data("fixture", "unknown")
+        (self.directory / "cleaned.tsv").unlink()
+        with self.assertRaisesRegex(TaskError, "完整净表"):
+            self.tasks.chart_data("fixture", "scatter")
+        self.assertFalse(list(self.project.rglob("*.rules.json")))
+
 
 if __name__ == "__main__":
     unittest.main()

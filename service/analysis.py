@@ -56,8 +56,11 @@ def _record(line: bytes) -> tuple[str, list]:
         raise AnalysisError("净表格式损坏，无法提供可核验的统计。") from error
 
 
-def analyze_cleaned(directory: Path, report: dict, options: dict) -> dict:
+def analyze_cleaned(directory: Path, report: dict, options: dict, *, all_groups: bool = False) -> dict:
     query = validate_options(options)
+    if all_groups:
+        # Chart-only callers need the complete movie population, not a top-50 ranking.
+        query["limit"] = None
     source = directory / "cleaned.tsv"
     if not source.is_file():
         raise AnalysisError("本机缺少该任务的完整净表，请转交 cleaned.tsv 或明确要求重新清洗；报告和样例不能替代完整数据。")
@@ -108,7 +111,7 @@ def analyze_cleaned(directory: Path, report: dict, options: dict) -> dict:
                 raise ValueError()
         except (KeyError, ValueError, TypeError, AttributeError) as error:
             raise AnalysisError("正式报告缺少有效的时间切分边界，无法按时间段统计。") from error
-    groups, coverage = {}, Counter()
+    groups, coverage, matched_distribution = {}, Counter(), Counter()
     with source.open("rb") as stream:
         for line in stream:
             table, fields = _record(line)
@@ -139,6 +142,7 @@ def analyze_cleaned(directory: Path, report: dict, options: dict) -> dict:
                 coverage["missing_genre_ratings"] += 1
                 continue
             coverage["matched_ratings"] += 1
+            matched_distribution[rating] += 1
             keys = (movie_id,) if query["group_by"] == "movie" else genres
             for key in keys:
                 group = groups.setdefault(key, {"rating_count": 0, "rating_sum": 0, "users": set(), "distribution": Counter()})
@@ -184,6 +188,7 @@ def analyze_cleaned(directory: Path, report: dict, options: dict) -> dict:
     result = {"analysis_id": analysis_id, "version": VERSION, "implementation_sha256": implementation_hash,
               "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "source": source_info, "query": query, "rows": rows,
+              "rating_distribution": {str(i): matched_distribution[i] for i in range(1, 6)},
               "coverage": {key: coverage[key] for key in ("total_ratings", "period_ratings", "filtered_ratings", "missing_movie_ratings", "missing_genre_ratings", "matched_ratings")},
               "groups": {"total": len(groups), "eligible": eligible_count, "returned": len(rows),
                          "below_min_ratings": len(groups) - eligible_count},
