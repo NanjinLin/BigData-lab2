@@ -11,3 +11,7 @@ __pycache__/
 
 # Local Python ML environment and downloaded packages.
 .venv/
+.env
+.env.*
+!.env.example
+/tmp/

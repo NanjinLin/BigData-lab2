@@ -50,6 +50,7 @@ function renderMessage(message, {pending=false,error=false} = {}) {
     else renderModelAnswer(content, {answer:message.content,model:message.model,model_response_id:message.model_response_id,evidence:message.evidence});
     if(message.workflow){const plan=node("div","workflow-host");renderWorkflow(plan,message.workflow);content.prepend(plan);}
     for(const result of message.analyses||[])content.append(renderAnalysis(result));
+    for(const result of message.preferences||[])content.append(renderPreferenceResult(result));
     // Classification results already appear in the Agent answer. Avoid repeating
     // the same predictions as another stack of cards below the response.
     if (message.task_id) content.append(taskInline(message.task_id));

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/workflow.css">
   <link rel="stylesheet" href="/charts.css">
   <link rel="stylesheet" href="/classification.css">
+  <link rel="stylesheet" href="/preferences.css">
 </head>
 <body>
   <div class="app-shell">
@@ -28,7 +29,7 @@
           <button type="button" class="nav-item" data-chart="scatter"><span class="item-icon" aria-hidden="true">⠿</span><span class="item-label">评分次数与平均分</span></button>
         </div>
         <div class="nav-title"><span>机器学习分析</span></div>
-        <div class="nav-list"><button id="classification-open" class="nav-item" type="button"><span class="item-icon" aria-hidden="true">◈</span><span class="item-label">评分分类 · 两算法对照</span></button></div>
+        <div class="nav-list"><button id="classification-open" class="nav-item" type="button"><span class="item-icon" aria-hidden="true">◈</span><span class="item-label">评分分类 · 两算法对照</span></button><button id="preferences-open" class="nav-item" type="button"><span class="item-icon" aria-hidden="true">⠿</span><span class="item-label">用户聚类 · 降维对照</span></button></div>
         <div class="nav-title"><span>对话</span><button id="refresh-chats" class="icon-button subtle" type="button" title="刷新对话">↻</button></div>
         <div id="chat-list" class="nav-list" aria-label="历史对话"></div>
         <div class="nav-title task-title"><span>处理任务</span><button id="refresh-tasks" class="icon-button subtle" type="button" title="刷新任务">↻</button></div>
@@ -96,6 +97,24 @@
     </form>
     <div id="classification-predictions" class="classification-predictions"></div>
   </dialog>
+  <dialog id="preferences-dialog" class="preferences-dialog" aria-labelledby="preferences-title">
+    <div class="pref-heading"><div><p class="eyebrow">MOVIELENS · USER PREFERENCES</p><h2 id="preferences-title">用户群体与偏好空间</h2><p>只用训练期历史，比较两种聚类与两种降维。</p></div><button id="preferences-close" class="icon-button" type="button" aria-label="关闭画像面板">×</button></div>
+    <form id="preferences-form">
+      <div class="pref-toolbar"><label for="preferences-task">清洗任务</label><select id="preferences-task" required><option value="">选择任务</option></select><button id="preferences-run" class="primary-button" type="submit">运行画像分析</button></div>
+      <details class="pref-config"><summary>实验参数</summary><div class="pref-fields">
+        <label>最少训练评分<input id="pref-min-history" type="number" min="1" max="10000" value="5" required></label>
+        <label>K-Means 群数<input id="pref-n-clusters" type="number" min="2" max="20" value="4" required></label>
+        <label>DBSCAN eps<input id="pref-eps" type="number" min="0.01" max="100" step="any" value="3" required></label>
+        <label>DBSCAN 最少邻居<input id="pref-min-samples" type="number" min="2" max="1000" value="10" required></label>
+        <label>目标维数<input id="pref-dimensions" type="number" min="1" max="56" value="2" required></label>
+        <label>方差保留阈值（可选）<input id="pref-retention" type="number" min="0.01" max="1" step="any" placeholder="例如 0.9；填写后优先"></label>
+      </div><p>设置阈值后，系统按实际方差保留选择维数。每次运行保留独立版本；参数来自当前表单。</p></details>
+    </form>
+    <p id="preferences-status" class="pref-status" role="status" aria-live="polite"></p>
+    <div id="preferences-results"></div>
+    <form id="preferences-query" class="pref-query" hidden><label for="preferences-users">查询用户（逗号分隔，最多 200 人）</label><div class="pref-toolbar"><input id="preferences-users" placeholder="例如 1, 2, 2216" required><select id="preferences-algorithm" aria-label="查询算法"><option value="kmeans">K-Means</option><option value="dbscan">DBSCAN</option><option value="pca">PCA</option><option value="truncated_svd">截断 SVD</option></select><button class="secondary-button" type="submit">查看用户结果</button></div></form>
+    <div id="preferences-user-results"></div>
+  </dialog>
   <script src="/markdown-it.min.js" defer></script>
   <script src="/markdown.js" defer></script>
   <script src="/workflow.js" defer></script>
@@ -103,5 +122,6 @@
   <script src="/charts.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/classification.js" defer></script>
+  <script src="/preferences.js" defer></script>
 </body>
 </html>

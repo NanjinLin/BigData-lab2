@@ -16,6 +16,9 @@ from typing import Callable
 
 from .agent import CUSTOM_TOOL, RULE_VERSION, RUN_TOOL, _arguments, _text, _tool_calls
 from .classification import ClassificationError
+from .preferences import PreferenceError
+from .preference_tools import (PREFERENCE_TOOLS, PREFERENCE_OPERATIONS, QUERY_NAMES,
+                               TRAIN_PREFERENCES, PREFERENCE_STATUS, PREFERENCE_REPORT)
 from .model import ModelError, ResponsesClient
 from .rules import RuleConfigError, build_rules
 from .tasks import TaskError, TaskService
@@ -115,6 +118,15 @@ CHAT_INSTRUCTIONS = (
     "这些调用会由本系统按顺序执行，不能同时提交多个清洗或训练任务。"
     "使用分类工具前应选取一个已完成且有完整净表的任务，所有分类模型以该任务的数据版本与T1/T2为准。"
     "没有模型时说明需要完成训练，不得虚构概率、类别或验证指标。"
+    "聚类与降维由独立工具cluster_users_kmeans、cluster_users_dbscan、reduce_users_pca、reduce_users_truncated_svd读取实际结果。"
+    "未指定聚类算法时调用两种聚类工具，未指定降维算法时调用两种降维工具；指定时仅调用指定算法。"
+    "先read_preferences_report获取真实配置；查询parameters使用报告配置，只有用户明确改变的参数才修改。"
+    "用户明确要求运行/训练画像分析时使用train_user_preferences，异步进展用get_preferences_status。"
+    "没有结果或参数不匹配时解释需要训练；不得自行替换参数。默认min_history=5,n_clusters=4,eps=3,min_samples=10,dimensions=2,retention=null。"
+    "用户指定信息保留阈值时设置retention，实际维数由模型决定；两种降维都含原始与降维后的KMeans和DBSCAN对照。"
+    "降维工具comparison_algorithm可指定kmeans或dbscan，未指定对照聚类时使用both。"
+    "user_ids为空仅代表30人样例，不是全体用户；指定集合只查询，不重新拟合子集。训练期历史不足与未知ID逐人说明。"
+    "群体标签与噪声是统计描述；聚类内部指标、方差保留率不能称为测试准确率或因果结论。"
     "计划执行后必须调用 assess_analysis_goal，结合本轮工具结果判断是否回答了原问题，再生成自然语言回复。"
     "核验不通过或仍待运行时如实说明；用户问结果时只提交任务并没有完成目标。"
 )
@@ -252,11 +264,12 @@ def _short_classification_answer(message: str, results: list[dict]) -> str | Non
 
 class ChatService:
     def __init__(self, project: Path, tasks: TaskService,
-                 model_getter: Callable[[], ResponsesClient | None], classifiers=None) -> None:
+                 model_getter: Callable[[], ResponsesClient | None], classifiers=None, preferences=None) -> None:
         self.folder = project.resolve() / "runs" / ".conversations"
         self.tasks = tasks
         self.model_getter = model_getter
         self.classifiers = classifiers
+        self.preferences = preferences
         self.lock = threading.RLock()
         self.activity_lock = threading.Lock()
         self.activities: dict[str, dict] = {}
@@ -327,6 +340,29 @@ class ChatService:
     def _run_tool(self, name: str, args: dict, response_id: str | None,
                   prompt: str, selected_task_id: str | None,
                   model_name: str) -> tuple[dict, str | None, str | None]:
+        if name in PREFERENCE_OPERATIONS:
+            if self.preferences is None:
+                raise TaskError("画像分析服务尚未初始化。", 503)
+            task_id = args.get("task_id") or selected_task_id
+            if not isinstance(task_id, str) or not task_id:
+                raise TaskError("请先选择清洗任务或提供任务ID。", 422)
+            try:
+                if name == TRAIN_PREFERENCES["name"] and set(args) == {"task_id", "parameters"}:
+                    return self.preferences.start(task_id, args["parameters"]), task_id, None
+                if name == PREFERENCE_STATUS["name"] and set(args) == {"task_id"}:
+                    return self.preferences.status(task_id), task_id, None
+                if name == PREFERENCE_REPORT["name"] and set(args) == {"task_id"}:
+                    saved = self.preferences.result(task_id)
+                    return saved, task_id, f"runs/{task_id}/preferences/{saved['experiment_id']}/report.json"
+                if name in QUERY_NAMES and set(args) in ({"task_id", "user_ids", "parameters"},
+                                                        {"task_id", "user_ids", "parameters", "comparison_algorithm"}):
+                    category, algorithm = QUERY_NAMES[name]
+                    result = self.preferences.query(task_id, category, algorithm, args["user_ids"], args["parameters"],
+                                                    args.get("comparison_algorithm", "both"))
+                    return result, task_id, result["evidence"]
+                raise TaskError("画像分析工具参数无效。", 422)
+            except PreferenceError as exc:
+                raise TaskError(str(exc), 422) from exc
         if name == RUN_TOOL["name"]:
             if args != {"rule_version": RULE_VERSION}:
                 raise TaskError("模型提交的默认规则参数无效，任务未启动。", 422)
@@ -423,10 +459,12 @@ class ChatService:
             history.append({"role": "user", "content": user["content"]})
             instructions = CHAT_INSTRUCTIONS + (f" 当前选中的任务 ID：{selected}。" if selected else " 当前没有选中任务。")
             tools = [PLAN_TOOL, ASSESS_TOOL, ANALYZE_TOOL, RUN_TOOL, CUSTOM_TOOL, READ_STATUS, READ_REPORT, LIST_TASKS,
-                     TRAIN_CLASSIFIERS, CLASSIFIER_STATUS, CLASSIFIER_REPORT, PREDICT_LOGISTIC, PREDICT_TREE]
+                     TRAIN_CLASSIFIERS, CLASSIFIER_STATUS, CLASSIFIER_REPORT, PREDICT_LOGISTIC, PREDICT_TREE,
+                     *PREFERENCE_TOOLS]
             evidence = []
             workflow = None
             validations, analyses, classifications = [], [], []
+            preference_results, preference_errors = [], []
             prediction_errors = []
             task_id = selected
             launched = False
@@ -439,7 +477,7 @@ class ChatService:
                 if started_task_id:
                     return (f"任务 {started_task_id} 已提交，但模型未能完成后续说明：{reason}。"
                             "你可以在任务列表查看进度，并稍后继续提问。")
-                if analyses or classifications:
+                if analyses or classifications or preference_results:
                     return (f"结果已计算并保留，但模型未能完成后续说明：{reason}。"
                             "请展开统计卡片查看数据、样本量和局限。")
                 return None
@@ -481,6 +519,7 @@ class ChatService:
                     safe_batch = {PLAN_TOOL["name"], READ_STATUS["name"], READ_REPORT["name"],
                                   LIST_TASKS["name"], ANALYZE_TOOL["name"],
                                   CLASSIFIER_STATUS["name"], CLASSIFIER_REPORT["name"],
+                                  PREFERENCE_STATUS["name"], PREFERENCE_REPORT["name"], *QUERY_NAMES,
                                   *PREDICT_NAMES}
                     names = [call.get("name") for call in calls]
                     if (len(calls) > 6 or any(name not in safe_batch for name in names)
@@ -527,7 +566,7 @@ class ChatService:
                                 launched = True
                             result, task_id, source = self._run_tool(name, args, response.get("id"),
                                                                    user["content"], task_id, model.model)
-                            submitted = name in (RUN_TOOL["name"], CUSTOM_TOOL["name"], TRAIN_CLASSIFIERS["name"])
+                            submitted = name in (RUN_TOOL["name"], CUSTOM_TOOL["name"], TRAIN_CLASSIFIERS["name"], TRAIN_PREFERENCES["name"])
                             if submitted:
                                 started_task_id = task_id
                             if step is not None:
@@ -541,10 +580,17 @@ class ChatService:
                             if name in PREDICT_NAMES:
                                 classifications.append(result)
                                 validations.append({"status": "sufficient", "warnings": [result["history_warning"]] if result.get("history_warning") else []})
+                            if name in QUERY_NAMES:
+                                preference_results.append(result)
+                                warnings = [u["reason"] for u in result["users"] if u.get("reason")]
+                                validations.append({"status": "insufficient" if all(u.get("reason") for u in result["users"]) else "sufficient",
+                                                    "warnings": list(dict.fromkeys(warnings))})
                     except (TaskError, ModelError) as error:
                         result = {"error": str(error), "task_started": False}
                         if name in PREDICT_NAMES:
                             prediction_errors.append({"algorithm": PREDICT_NAMES[name], "reason": str(error)})
+                        if name in QUERY_NAMES or name == PREFERENCE_REPORT["name"]:
+                            preference_errors.append(str(error))
                         if step is not None:
                             step.update(state="failed", detail=str(error))
                     self._activity(chat_id, workflow=workflow)
@@ -553,7 +599,7 @@ class ChatService:
             if final_response is None and not fallback_answer and started_task_id:
                 fallback_answer = (f"任务 {started_task_id} 已提交。模型的后续工具调用超过上限，"
                                    "请从任务列表查看状态。")
-            if final_response is None and not fallback_answer and (analyses or classifications):
+            if final_response is None and not fallback_answer and (analyses or classifications or preference_results):
                 fallback_answer = "统计结果已计算并保留。模型调用达到上限，请展开统计卡片查看数据和局限。"
             if final_response is None and not fallback_answer:
                 raise TaskError("模型工具调用次数超过上限，请缩小请求范围。", 502)
@@ -579,6 +625,10 @@ class ChatService:
             elif (classifications and workflow and (workflow.get("validation") or {}).get("answerable")
                   and not fallback_answer):
                 answer = _short_classification_answer(user["content"], classifications) or answer
+            if preference_errors:
+                answer = "聚类/降维未完成：" + "；".join(dict.fromkeys(preference_errors))
+                if preference_results:
+                    answer += "。已成功取得的部分结果保留在下方证据卡片中。"
             if not answer:
                 answer = preserved_answer("模型没有生成回答")
                 if not answer:
@@ -590,7 +640,8 @@ class ChatService:
             assistant = {"role": "assistant", "content": answer, "created_at": now(),
                          "model": model.model, "model_response_id": final_response.get("id") if final_response else None,
                          "task_id": started_task_id, "evidence": evidence,
-                         "workflow": workflow, "analyses": analyses, "classifications": classifications}
+                         "workflow": workflow, "analyses": analyses, "classifications": classifications,
+                         "preferences": preference_results}
             chat["messages"].extend([user, assistant])
             chat["selected_task_id"] = task_id
             chat["updated_at"] = now()

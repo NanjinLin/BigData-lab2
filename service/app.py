@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .classification import ClassificationError, ClassificationService
+from .preferences import PreferenceError, PreferenceService
 from .agent import DataGovernanceAgent
 from .chat import ChatService
 from .model import ModelError, ResponsesClient, normalize_base_url
@@ -25,9 +26,10 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                   runner=None, agent: DataGovernanceAgent | None = None) -> ThreadingHTTPServer:
     service = TaskService(project, runner=runner, agent=agent)
     classifiers = ClassificationService(service)
+    preferences = PreferenceService(service)
     settings_lock = threading.RLock()
     model_client = getattr(service.agent, "model", None)
-    chat = ChatService(project, service, lambda: model_client, classifiers=classifiers)
+    chat = ChatService(project, service, lambda: model_client, classifiers=classifiers, preferences=preferences)
 
     def model_settings() -> dict:
         with settings_lock:
@@ -111,11 +113,25 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                             self._json(200, classifiers.result(task_id),
                                        "classification-report.json" if "download=1" in urlsplit(self.path).query else False)
                             return
+                    if len(parts) >= 5 and parts[3] == "preferences":
+                        if len(parts) == 5 and parts[4] == "status":
+                            self._json(200, preferences.status(task_id))
+                            return
+                        if len(parts) == 5 and parts[4] == "report":
+                            self._json(200, preferences.result(task_id),
+                                       "preferences-report.json" if "download=1" in urlsplit(self.path).query else False)
+                            return
+                        if len(parts) == 6 and parts[4] == "data":
+                            self._json(200, preferences.data(task_id, parts[5]),
+                                       parts[5] if "download=1" in urlsplit(self.path).query else False)
+                            return
                     if len(parts) == 5 and parts[3] == "analyses":
                         self._json(200, service.analysis_result(task_id, parts[4]),
                                    "statistics.json" if "download=1" in urlsplit(self.path).query else False)
                         return
                 files = {"/": ("index.html", "text/html; charset=utf-8"),
+                         "/preferences.js": ("preferences.js", "text/javascript; charset=utf-8"),
+                         "/preferences.css": ("preferences.css", "text/css; charset=utf-8"),
                          "/markdown-it.min.js": ("vendor/markdown-it.min.js", "text/javascript; charset=utf-8"),
                          "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
                          "/workflow.js": ("workflow.js", "text/javascript; charset=utf-8"),
@@ -138,7 +154,7 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                 raise TaskError("页面或接口不存在。", 404)
             except TaskError as error:
                 self._json(error.code, {"error": str(error)})
-            except ClassificationError as error:
+            except (ClassificationError, PreferenceError) as error:
                 self._json(422, {"error": str(error)})
 
         def do_POST(self) -> None:
@@ -155,6 +171,15 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                     self._json(201, chat.create())
                     return
                 parts = route.strip("/").split("/")
+                if len(parts) == 5 and parts[:2] == ["api", "tasks"] and parts[3] == "preferences":
+                    if parts[4] == "train":
+                        self._json(202, preferences.start(parts[2], body))
+                        return
+                    if parts[4] == "query":
+                        if set(body) - {"category", "algorithm", "user_ids", "parameters", "comparison_algorithm"} or not {"category", "algorithm"} <= set(body):
+                            raise TaskError("查询需提供category和algorithm，可选user_ids及parameters。", 400)
+                        self._json(200, preferences.query(parts[2], **body))
+                        return
                 if len(parts) == 5 and parts[:2] == ["api", "tasks"] and parts[3] == "classification":
                     if parts[4] == "train":
                         if body:
@@ -186,7 +211,7 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
                 raise TaskError("接口不存在。", 404)
             except TaskError as error:
                 self._json(error.code, {"error": str(error)})
-            except ClassificationError as error:
+            except (ClassificationError, PreferenceError) as error:
                 self._json(422, {"error": str(error)})
 
         def do_PUT(self) -> None:
