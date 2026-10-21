@@ -406,8 +406,9 @@ class ClassificationService:
     """Asynchronous trainer attached to existing TaskService; no Hadoop re-run."""
     def __init__(self, tasks):
         self.tasks = tasks
-        self.lock = threading.Lock()
+        self.lock = tasks.lock
         self.running: set[str] = set()
+        tasks.task_users["classification"] = self.running
 
     def _directory(self, task_id: str) -> Path:
         return self.tasks._directory(task_id)
@@ -442,11 +443,11 @@ class ClassificationService:
         return predict(self._directory(task_id), self.tasks.report(task_id), user_id, movie_id, algorithm)
 
     def start(self, task_id: str):
-        report = self.tasks.report(task_id)
-        directory = self._directory(task_id)
-        if not (directory / "cleaned.tsv").is_file():
-            raise ClassificationError("该任务尚无完整 cleaned.tsv，不能训练分类模型。")
         with self.lock:
+            report = self.tasks.report(task_id)
+            directory = self._directory(task_id)
+            if not (directory / "cleaned.tsv").is_file():
+                raise ClassificationError("该任务尚无完整 cleaned.tsv，不能训练分类模型。")
             if task_id in self.running:
                 raise ClassificationError("当前任务的分类训练正在进行。")
             self.running.add(task_id)

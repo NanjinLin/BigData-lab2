@@ -345,8 +345,9 @@ def artifact(directory: Path, report: dict, name: str):
 class PreferenceService:
     def __init__(self, tasks):
         self.tasks = tasks
-        self.lock = threading.Lock()
+        self.lock = tasks.lock
         self.running = set()
+        tasks.task_users["preferences"] = self.running
 
     def result(self, task_id):
         return training_report(self.tasks._directory(task_id), self.tasks.report(task_id))
@@ -376,11 +377,11 @@ class PreferenceService:
 
     def start(self, task_id, config=None):
         config = options(config)
-        report = self.tasks.report(task_id)
-        directory = self.tasks._directory(task_id)
-        if not (directory / "cleaned.tsv").is_file():
-            raise PreferenceError("该任务缺少完整cleaned.tsv，不能运行画像分析。")
         with self.lock:
+            report = self.tasks.report(task_id)
+            directory = self.tasks._directory(task_id)
+            if not (directory / "cleaned.tsv").is_file():
+                raise PreferenceError("该任务缺少完整cleaned.tsv，不能运行画像分析。")
             if self.running:
                 raise PreferenceError("已有画像分析正在运行，请完成后再提交。")
             self.running.add(task_id)

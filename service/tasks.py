@@ -6,6 +6,7 @@ import json
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import threading
 import uuid
@@ -47,7 +48,8 @@ class TaskService:
         self.project = project.resolve()
         self.runner = runner or self._run_pipeline
         self.agent = agent or DataGovernanceAgent()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
+        self.task_users: dict[str, set[str]] = {}
         self.active: str | None = None
         self.pending: dict[str, dict] = {}
 
@@ -95,7 +97,34 @@ class TaskService:
     def _directory(self, task_id: str) -> Path:
         if not TASK_ID.fullmatch(task_id):
             raise TaskError("无效的任务 ID。", 400)
-        return self.project / "runs" / task_id
+        root = self.project / "runs"
+        directory = root / task_id
+        if root.is_symlink() or directory.is_symlink() or directory.resolve().parent != root.resolve():
+            raise TaskError("任务目录不安全，拒绝访问。", 400)
+        return directory
+
+    def delete(self, task_id: str) -> dict:
+        """Remove terminal local records; HDFS originals and chat messages are retained."""
+        with self.lock:
+            directory = self._directory(task_id)
+            owner_file = self.lock_dir / "task_id"
+            owner = owner_file.read_text(encoding="ascii").strip() if owner_file.is_file() else None
+            if (self.active == task_id or task_id in self.pending or owner == task_id
+                    or any(task_id in users for users in self.task_users.values())):
+                raise TaskError("此任务仍在清洗或训练中，暂时不能删除。", 409)
+            if self.status(task_id).get("state") not in ("completed", "failed"):
+                raise TaskError("任务尚未结束或状态不明，请确认 Hadoop 执行状态后再处理。", 409)
+            sidecars = [directory.parent / f"{task_id}{suffix}" for suffix in
+                        (".agent.json", ".rules.json", ".service.log")]
+            if any(path.is_symlink() for path in sidecars):
+                raise TaskError("任务关联文件不安全，拒绝删除。", 400)
+            try:
+                shutil.rmtree(directory)
+                for path in sidecars:
+                    path.unlink(missing_ok=True)
+            except OSError as error:
+                raise TaskError("删除本机任务文件失败，请检查文件占用和权限。", 500) from error
+            return {"task_id": task_id, "deleted": True, "scope": "local"}
 
     def start(self, prompt: str) -> dict:
         with self.lock:
@@ -305,13 +334,14 @@ class TaskService:
 
     def analyze(self, task_id: str, options: dict) -> dict:
         from .analysis import AnalysisError, analyze_cleaned
-        report = self.report(task_id)
-        try:
-            return analyze_cleaned(self._directory(task_id), report, options)
-        except AnalysisError as error:
-            raise TaskError(str(error), 422) from error
-        except OSError as error:
-            raise TaskError("无法读取净表或保存统计结果，请检查本机文件。", 500) from error
+        with self.lock:
+            report = self.report(task_id)
+            try:
+                return analyze_cleaned(self._directory(task_id), report, options)
+            except AnalysisError as error:
+                raise TaskError(str(error), 422) from error
+            except OSError as error:
+                raise TaskError("无法读取净表或保存统计结果，请检查本机文件。", 500) from error
 
     def analysis_result(self, task_id: str, analysis_id: str) -> dict:
         if not re.fullmatch(r"analysis-[0-9a-f]{24}", analysis_id):
@@ -328,15 +358,16 @@ class TaskService:
         from .analysis import AnalysisError, analyze_cleaned
         if kind not in ("genre", "distribution", "scatter"):
             raise TaskError("不支持的图表类型。", 400)
-        report = self.report(task_id)
-        try:
-            return analyze_cleaned(self._directory(task_id), report,
-                                   {"group_by": "genre" if kind == "genre" else "movie"},
-                                   all_groups=kind != "genre")
-        except AnalysisError as error:
-            raise TaskError(str(error), 422) from error
-        except OSError as error:
-            raise TaskError("无法读取净表或保存图表统计，请检查本机文件。", 500) from error
+        with self.lock:
+            report = self.report(task_id)
+            try:
+                return analyze_cleaned(self._directory(task_id), report,
+                                       {"group_by": "genre" if kind == "genre" else "movie"},
+                                       all_groups=kind != "genre")
+            except AnalysisError as error:
+                raise TaskError(str(error), 422) from error
+            except OSError as error:
+                raise TaskError("无法读取净表或保存图表统计，请检查本机文件。", 500) from error
 
     def list_tasks(self) -> list[dict]:
         root = self.project / "runs"

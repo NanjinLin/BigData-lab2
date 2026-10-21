@@ -242,6 +242,13 @@ def create_server(project: Path = ROOT, host: str = "127.0.0.1", port: int = 876
 
         def do_DELETE(self) -> None:
             nonlocal model_client
+            parts = urlsplit(self.path).path.strip("/").split("/")
+            if len(parts) == 3 and parts[:2] == ["api", "tasks"]:
+                try:
+                    self._json(200, service.delete(parts[2]))
+                except TaskError as error:
+                    self._json(error.code, {"error": str(error)})
+                return
             if urlsplit(self.path).path != "/api/model-config":
                 self._json(404, {"error": "接口不存在。"})
                 return

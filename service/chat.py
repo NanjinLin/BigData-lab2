@@ -300,6 +300,13 @@ class ChatService:
             raise TaskError("会话记录无法读取。", 500) from error
         if not isinstance(value, dict) or value.get("id") != chat_id or not isinstance(value.get("messages"), list):
             raise TaskError("会话记录结构损坏。", 500)
+        if value.get("selected_task_id"):
+            try:
+                self.tasks.status(value["selected_task_id"])
+            except TaskError as error:
+                if error.code != 404:
+                    raise
+                value["selected_task_id"] = None
         return value
 
     def _save(self, value: dict) -> None:

@@ -196,6 +196,8 @@ class Pipeline:
             raise RuntimeError(f"HDFS output did not materialize: {source}")
 
     def check_cluster(self) -> None:
+        self.command("wait_hdfs_ready", [sys.executable, str(PROJECT / "scripts/hadoop_ready.py"),
+                                        "--hdfs", str(HDFS)])
         self.command("check_hdfs", [str(HDFS), "dfs", "-ls", "/"])
         output = self.command("check_yarn", [str(HADOOP_HOME / "bin/yarn"), "node", "-list"], capture=True)
         if "RUNNING" not in output:

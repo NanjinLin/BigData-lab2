@@ -2,7 +2,7 @@ const $ = (id) => document.getElementById(id);
 const dimensionNames = {Accurate:"准确性",Complete:"完整性",Unique:"唯一性","Up-to-date":"时效性",Consistent:"一致性"};
 const tableNames = {ratings:"评分",users:"用户",movies:"电影"};
 const stateNames = {created:"准备中",queued:"排队中",running:"运行中",completed:"已完成",failed:"失败",unknown:"状态不明"};
-const stageNames = {waiting_for_worker:"等待启动",starting_pipeline:"准备运行环境",check_hdfs:"检查 HDFS",check_yarn:"检查 YARN",create_raw_dir:"创建原始数据目录",score_before:"清洗前评分",clean:"清洗数据",export_clean:"导出净表",score_after:"清洗后评分",download_score_before:"下载清洗前结果",download_clean_process:"下载审计结果",download_cleaned:"下载净表",download_score_after:"下载清洗后结果",completed:"完成",historical_report:"历史报告",startup:"启动失败"};
+const stageNames = {waiting_for_worker:"等待启动",starting_pipeline:"准备环境并等待 Hadoop 就绪",check_hdfs:"检查 HDFS",wait_hdfs_ready:"等待 HDFS 退出安全模式",check_yarn:"检查 YARN",create_raw_dir:"创建原始数据目录",score_before:"清洗前评分",clean:"清洗数据",export_clean:"导出净表",score_after:"清洗后评分",download_score_before:"下载清洗前结果",download_clean_process:"下载审计结果",download_cleaned:"下载净表",download_score_after:"下载清洗后结果",completed:"完成",historical_report:"历史报告",startup:"启动失败"};
 const reasonNames = {policy_rating_below_minimum:"低于最低保留评分",policy_missing_title_year:"标题缺少年份",policy_filtered_movie_reference:"引用被过滤电影"};
 let activeChatId = null;
 let selectedTaskId = null;
@@ -111,12 +111,34 @@ async function loadTasks() {
   const list = $("task-list"); list.replaceChildren();
   if (!tasks.length) list.append(node("div", "nav-empty", "还没有处理任务"));
   for (const task of tasks.slice(0, 30)) {
+    const row = node("div", "task-nav-row");
     const item = node("button", `nav-item${task.task_id === selectedTaskId ? " active" : ""}`);
     item.type = "button"; item.title = `${task.task_id} · ${statusText(task)}`;
     item.append(node("span", "item-icon", "▦"),node("span", "item-label", task.task_id),node("span", `status-dot ${task.state}`));
     item.addEventListener("click", () => selectTask(task.task_id, true));
-    list.append(item);
+    const remove = node("button", "task-delete", "×");
+    remove.type = "button";
+    remove.title = "删除本机任务记录";
+    remove.setAttribute("aria-label", `删除任务 ${task.task_id}`);
+    remove.disabled = !["completed", "failed"].includes(task.state);
+    remove.addEventListener("click", () => void deleteTask(task.task_id));
+    row.append(item, remove); list.append(row);
   }
+}
+async function deleteTask(taskId) {
+  if (sending) { window.alert("请等当前对话处理完成后再删除任务。"); return; }
+  if (!window.confirm(`删除任务 ${taskId}？\n\n将删除本机任务记录、报告、净表、统计和模型文件，无法撤销。\n聊天消息及 HDFS 中的数据保留。`)) return;
+  try {
+    await api(`/api/tasks/${encodeURIComponent(taskId)}`, {method:"DELETE"});
+    reportCache.delete(taskId);
+    taskSelectionToken++; inspectorRequest++;
+    if (selectedTaskId === taskId) { selectedTaskId = null; updateContext(); }
+    if (inspectorState?.taskId === taskId || $("inspector-title").textContent === taskId) {
+      inspectorState = null; closeInspector();
+      $("inspector-body").replaceChildren(node("div", "empty-inspector", "任务记录已删除"));
+    }
+    await loadTasks();
+  } catch (error) { window.alert(`删除未完成：${error.message}`); }
 }
 async function selectTask(taskId, open) {
   const token = ++taskSelectionToken;
@@ -173,6 +195,12 @@ async function renderInspector(taskId) {
       addAction(actions,"分析电影类型评分",()=>{closeInspector();sendMessage("请复用当前任务净表，比较不同电影类型的平均评分、评分次数和参与人数，说明样本量与统计局限。")});
     }
     body.append(actions);
+    if (["completed", "failed"].includes(status.state)) {
+      const remove = node("button", "danger-button", "删除本机任务记录");
+      remove.type = "button";
+      remove.addEventListener("click", () => void deleteTask(taskId));
+      actions.append(remove);
+    }
     if(status.agent){const s=section("本次执行配置");s.append(detailRow("使用工具",status.agent.tool||"未记录"));s.append(detailRow("规则版本",status.agent.rule_version||"未记录"));if(status.agent.options)s.append(detailRow("规则参数",JSON.stringify(status.agent.options)));body.append(s);}
     if(status.state!=="completed")return;
     let report=reportCache.get(taskId);

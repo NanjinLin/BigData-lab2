@@ -20,8 +20,13 @@ fi
 source "$HADOOP_CONF_DIR/hadoop-env.sh"
 mkdir -p "$HOME/.local/share/ml1m-hadoop/logs"
 
+wait_for_hdfs() {
+  python3 "$(dirname "${BASH_SOURCE[0]}")/hadoop_ready.py" --hdfs "$HADOOP_HOME/bin/hdfs"
+}
+
 if timeout 6 "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
    timeout 6 "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
+  wait_for_hdfs
   echo "HDFS and YARN are already ready."
   exit 0
 fi
@@ -46,6 +51,7 @@ done
 for attempt in $(seq 1 15); do
   if timeout 6 "$HADOOP_HOME/bin/hdfs" dfs -ls / >/dev/null 2>&1 && \
      timeout 6 "$HADOOP_HOME/bin/yarn" node -list 2>&1 | grep -q RUNNING; then
+    wait_for_hdfs
     echo "HDFS and YARN are ready."
     exit 0
   fi
